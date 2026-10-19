@@ -1,0 +1,14 @@
+{
+  "name": "@financial/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "echo core-ok",
+    "test": "echo no-tests"
+  },
+  "dependencies": {
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "financial-app-react",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev:web": "pnpm --filter web dev"
+  }
+}
