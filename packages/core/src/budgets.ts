@@ -36,4 +36,8 @@ export const updateBudget = (id: number, limit: string | number) =>
 export const deleteBudget = (id: number) => apiDel<boolean>(`/api/budgets/${id}`);
 
 export const pct = (b: Budget) => Math.round((Number(b.spent) / Math.max(0.01, Number(b.limit))) * 100);
-export const stateOf = (b: Budget) => (pct(b) >= 100 ? 'over' : pct(b) >= 80 ? 'warn' : 'ok');
+// El umbral usa la razon exacta: `pct` redondea y 79.998% se veria como 80%.
+export const stateOf = (b: Budget) => {
+  const ratio = Number(b.spent) / Math.max(0.01, Number(b.limit));
+  return ratio >= 1 ? 'over' : ratio >= 0.8 ? 'warn' : 'ok';
+};

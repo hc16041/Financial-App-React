@@ -25,4 +25,4 @@ export function session(): Session {
   return { email, name, role, expires };
 }
 
-export const initial = (s: Session) => (s.name ?? s.email ?? '?').trim().charAt(0).toUpperCase();
+export const initial = (s: Session) => (s.name || s.email || '?').trim().charAt(0).toUpperCase();
