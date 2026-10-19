@@ -7,6 +7,7 @@ import { Pause, Pencil, Play, Plus, Receipt } from 'lucide-react';
 import {
   goalSchema, recurringSchema, listGoals, createGoal, updateGoal, depositGoal,
   listRecurring, createRecurring, toggleRecurring, payRecurring, listAccounts,
+  type Goal, type GoalForm, type RecurringForm,
 } from '@financial/core';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
@@ -18,7 +19,7 @@ export default function GoalsPage() {
   const [showGoal, setShowGoal] = useState(false);
   const [showRec, setShowRec] = useState(false);
   const [goalId, setGoalId] = useState<number | null>(null);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<Goal | null>(null);
   const [payId, setPayId] = useState<number | null>(null);
   const goals = useQuery({ queryKey: ['goals'], queryFn: listGoals });
   const recs = useQuery({ queryKey: ['recurring'], queryFn: listRecurring });
@@ -28,7 +29,7 @@ export default function GoalsPage() {
   const invA = () => qc.invalidateQueries({ queryKey: ['accounts'] });
   const addG = useMutation({ mutationFn: createGoal, onSuccess: invG });
   const updG = useMutation({
-    mutationFn: ({ id, ...f }: { id: number } & any) => updateGoal(id, f),
+    mutationFn: ({ id, ...f }: { id: number } & GoalForm) => updateGoal(id, f),
     onSuccess: () => { invG(); setEditing(null); fE.reset(); },
   });
   const depG = useMutation({
@@ -41,19 +42,19 @@ export default function GoalsPage() {
     mutationFn: ({ id, accountId }: { id: number; accountId: number }) => payRecurring(id, accountId),
     onSuccess: () => { invR(); invA(); qc.invalidateQueries({ queryKey: ['ptx'] }); },
   });
-  const fG = useForm<any>({ resolver: zodT(goalSchema as any) as any });
-  const fE = useForm<any>({ resolver: zodT(goalSchema as any) as any });
-  const fC = useForm<any>({ defaultValues: { amount: '100.00' } });
-  const fP = useForm<any>();
-  const fR = useForm<any>({ resolver: zodT(recurringSchema.omit({ active: true }) as any) as any, defaultValues: { frequency: 'Mensual' } });
+  const fG = useForm<GoalForm>({ resolver: zodT(goalSchema) });
+  const fE = useForm<GoalForm>({ resolver: zodT(goalSchema) });
+  const fC = useForm<{ amount: string; accountId: number }>({ defaultValues: { amount: '100.00' } });
+  const fP = useForm<{ accountId: number }>();
+  const fR = useForm<RecurringForm>({ resolver: zodT(recurringSchema), defaultValues: { frequency: 'Mensual' } });
 
-  const progress = (g: any) => Math.min(100, Math.max(0, (Number(g.current) / Math.max(0.01, Number(g.target))) * 100));
+  const progress = (g: Goal) => Math.min(100, Math.max(0, (Number(g.current) / Math.max(0.01, Number(g.target))) * 100));
   const hasAccounts = (accs.data ?? []).length > 0;
 
   const closeGoal = () => { setShowGoal(false); fG.reset(); };
   const closeRec = () => { setShowRec(false); fR.reset(); };
   const closeContribute = () => { setGoalId(null); fC.reset(); };
-  const openEdit = (g: any) => {
+  const openEdit = (g: Goal) => {
     setEditing(g);
     fE.reset({ name: g.name, target: String(g.target), deadline: g.deadline ? String(g.deadline).slice(0, 10) : '' });
   };
@@ -71,7 +72,7 @@ export default function GoalsPage() {
       />
 
       <Modal open={showGoal} onClose={closeGoal} title={t('goals.newGoal')}>
-        <form onSubmit={fG.handleSubmit((f: any) => addG.mutate(f as any, { onSuccess: closeGoal }))}>
+        <form onSubmit={fG.handleSubmit((f) => addG.mutate(f, { onSuccess: closeGoal }))}>
           <div className="field">
             <label htmlFor="goal-name">{t('common.name')}</label>
             <input id="goal-name" {...fG.register('name')} />
@@ -93,7 +94,7 @@ export default function GoalsPage() {
       </Modal>
 
       <Modal open={editing != null} onClose={closeEdit} title={t('common.edit')}>
-        <form onSubmit={fE.handleSubmit((f: any) => { if (editing) updG.mutate({ id: editing.id, ...f }); })}>
+        <form onSubmit={fE.handleSubmit((f) => { if (editing) updG.mutate({ id: editing.id, ...f }); })}>
           <div className="field">
             <label htmlFor="edit-name">{t('common.name')}</label>
             <input id="edit-name" {...fE.register('name')} />
@@ -115,7 +116,7 @@ export default function GoalsPage() {
       </Modal>
 
       <Modal open={goalId != null} onClose={closeContribute} title={t('goals.contribute')}>
-        <form onSubmit={fC.handleSubmit((f: any) => { if (goalId != null) depG.mutate({ id: goalId, a: f.amount, accountId: f.accountId }, { onSuccess: closeContribute }); })}>
+        <form onSubmit={fC.handleSubmit((f) => { if (goalId != null) depG.mutate({ id: goalId, a: f.amount, accountId: f.accountId }, { onSuccess: closeContribute }); })}>
           <div className="field">
             <label htmlFor="goal-account">{t('nav.accounts')}</label>
             <select id="goal-account" {...fC.register('accountId', { valueAsNumber: true })} defaultValue={accs.data?.[0]?.id}>
@@ -135,7 +136,7 @@ export default function GoalsPage() {
       </Modal>
 
       <Modal open={payId != null} onClose={closePay} title={t('goals.pay')}>
-        <form onSubmit={fP.handleSubmit((f: any) => { if (payId != null) payR.mutate({ id: payId, accountId: f.accountId }, { onSuccess: closePay }); })}>
+        <form onSubmit={fP.handleSubmit((f) => { if (payId != null) payR.mutate({ id: payId, accountId: f.accountId }, { onSuccess: closePay }); })}>
           <div className="field">
             <label htmlFor="pay-account">{t('nav.accounts')}</label>
             <select id="pay-account" {...fP.register('accountId', { valueAsNumber: true })} defaultValue={accs.data?.[0]?.id}>
@@ -180,7 +181,7 @@ export default function GoalsPage() {
       </div>
 
       <Modal open={showRec} onClose={closeRec} title={t('goals.recurring')}>
-        <form onSubmit={fR.handleSubmit((f: any) => addR.mutate({ ...f, active: true } as any, { onSuccess: closeRec }))}>
+        <form onSubmit={fR.handleSubmit((f) => addR.mutate({ ...f, active: true }, { onSuccess: closeRec }))}>
           <div className="field">
             <label htmlFor="rec-name">{t('common.name')}</label>
             <input id="rec-name" {...fR.register('name')} />

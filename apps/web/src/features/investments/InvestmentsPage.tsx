@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Plus, Trash2, TrendingUp } from 'lucide-react';
@@ -31,27 +31,28 @@ export default function InvestmentsPage() {
     onSuccess: inv,
   });
   const remove = useMutation({ mutationFn: deleteInvestment, onSuccess: inv });
-  const { register, handleSubmit, reset, setValue } = useForm<any>({
-    resolver: zodT(investmentSchema as any) as any,
+  const { register, handleSubmit, reset, setValue } = useForm<InvestmentForm>({
+    // commission tiene default en el schema: en el formulario siempre llega definido.
+    resolver: zodT(investmentSchema) as unknown as Resolver<InvestmentForm>,
     defaultValues: { transactionType: 2, transactionDate: new Date().toISOString().slice(0, 10), commission: '0' },
   });
 
   const items: Investment[] = Array.isArray(q.data) ? q.data : [];
   const total = items.reduce((a, x) => a + Number(x.total ?? 0), 0);
-  const opt = (v: string) => (v === '' ? undefined : Number(v));
+  const opt = (v: string | number | null | undefined) => (v === '' || v == null ? undefined : Number(v));
 
   const close = () => { setShowForm(false); setEditing(null); reset(); };
   const openCreate = () => { setEditing(null); reset(); setShowForm(true); };
   const openEdit = (x: Investment) => {
     setEditing(x);
     setValue('platformId', x.platformId); setValue('amount', String(x.amount));
-    setValue('commission', String(x.commission)); setValue('transactionType', (x.transactionType as number) ?? 2);
+    setValue('commission', String(x.commission)); setValue('transactionType', x.transactionType === 1 ? 1 : 2);
     setValue('transactionDate', String(x.transactionDate ?? '').slice(0, 10));
     setShowForm(true);
   };
 
-  const submit = (f: any) => {
-    const body = { ...f, withdrawalMethodId: opt(f.withdrawalMethodId), creditCardId: opt(f.creditCardId) };
+  const submit = (f: InvestmentForm) => {
+    const body: InvestmentForm = { ...f, withdrawalMethodId: opt(f.withdrawalMethodId), creditCardId: opt(f.creditCardId) };
     if (editing) update.mutate({ id: editing.id, v: body }, { onSuccess: close });
     else create.mutate(body, { onSuccess: close });
   };
@@ -76,7 +77,7 @@ export default function InvestmentsPage() {
           <div className="field">
             <label htmlFor="inv-plat">{t('invest.platform')}</label>
             <select id="inv-plat" {...register('platformId', { valueAsNumber: true })}>
-              {(plats.data ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {(plats.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div className="field">
@@ -102,14 +103,14 @@ export default function InvestmentsPage() {
             <label htmlFor="inv-method">{t('invest.noMethod')}</label>
             <select id="inv-method" {...register('withdrawalMethodId')}>
               <option value="">{t('invest.noMethod')}</option>
-              {(methods.data ?? []).map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {(methods.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div className="field">
             <label htmlFor="inv-card">{t('invest.noCard')}</label>
             <select id="inv-card" {...register('creditCardId')}>
               <option value="">{t('invest.noCard')}</option>
-              {(Array.isArray(cards.data) ? cards.data : []).map((c: any) => <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>)}
+              {(Array.isArray(cards.data) ? cards.data : []).map((c) => <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>)}
             </select>
           </div>
           {(create.isError || update.isError) && <p className="error-text">{((create.error ?? update.error) as Error)?.message}</p>}

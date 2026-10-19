@@ -30,6 +30,8 @@ export default function CardsPage() {
   const consItems = Array.isArray(cons.data) ? cons.data : [];
 
   const close = () => { setShowForm(false); reset(); };
+  // Columnas camelCase/PascalCase del API: se muestran como vienen.
+  const cell = (v: unknown) => (v == null || v === '' ? '�' : String(v));
 
   if (sum.isPending || cards.isPending) return <Skeleton rows={4} />;
   if (sum.isError || cards.isError)
@@ -44,9 +46,9 @@ export default function CardsPage() {
       />
 
       <div className="balance-strip">
-        <div className="balance-strip__total ledger-figure">{Number((sum.data as any)?.totalCurrentBalance ?? 0).toFixed(2)}</div>
+        <div className="balance-strip__total ledger-figure">{Number(sum.data?.totalCurrentBalance ?? 0).toFixed(2)}</div>
         <p style={{ color: 'var(--fp-text-muted)', margin: 'var(--fp-space-1) 0 0' }}>
-          {t('cards.limit')}: {Number((sum.data as any)?.totalCreditLimit ?? 0).toFixed(2)} · {t('cards.available')}: {Number((sum.data as any)?.totalAvailableCredit ?? 0).toFixed(2)}
+          {t('cards.limit')}: {Number(sum.data?.totalCreditLimit ?? 0).toFixed(2)} · {t('cards.available')}: {Number(sum.data?.totalAvailableCredit ?? 0).toFixed(2)}
         </p>
       </div>
 
@@ -86,11 +88,11 @@ export default function CardsPage() {
         <div className="table-wrap"><table className="ledger">
           <thead><tr><th>{t('common.name')}</th><th>{t('cards.limit')}</th><th>{t('cards.balance')}</th></tr></thead>
           <tbody>
-            {items.map((c: any) => (
+            {items.map((c) => (
               <tr key={c.id} data-sign="out">
                 <td>{c.name ?? `#${c.id}`}</td>
-                <td className="ledger-figure">{c.creditLimit ?? c.limit ?? '—'}</td>
-                <td className="ledger-figure">{c.currentBalance ?? c.balance ?? '—'}</td>
+                <td className="ledger-figure">{cell(c.creditLimit ?? c.limit)}</td>
+                <td className="ledger-figure">{cell(c.currentBalance ?? c.balance)}</td>
               </tr>
             ))}
           </tbody>
@@ -100,8 +102,8 @@ export default function CardsPage() {
       <h3 style={{ marginTop: 'var(--fp-space-4)' }}>{t('cards.consumption')}</h3>
       {cons.isPending ? <Skeleton rows={3} /> : consItems.length === 0 ? <p className="empty-state">{t('common.empty')}</p> : (
         <NameValueBars
-          names={consItems.map((r: any, i: number) => String(r.cardName ?? r.name ?? r.cardId ?? `#${i}`))}
-          values={consItems.map((r: any) => Number(r.total ?? r.amount ?? 0))}
+          names={consItems.map((r, i) => String(r.cardName ?? r.name ?? r.cardId ?? `#${i}`))}
+          values={consItems.map((r) => Number(r.total ?? r.amount ?? 0))}
           color="var(--fp-danger)"
           ariaLabel={t('cards.chartAria')}
         />

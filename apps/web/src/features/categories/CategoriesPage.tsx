@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
@@ -32,26 +32,27 @@ export default function CategoriesPage() {
   const remove = useMutation({ mutationFn: removeCategory, onSuccess: inv });
   const deact = useMutation({ mutationFn: (c: Category) => deactivateCategory(c.id, c), onSuccess: inv });
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<any>({
-    resolver: zodT(categorySchema.omit({ isActive: true }) as any) as any,
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<Form>({
+    // color/icon tienen default en el schema; en el formulario ya llegan siempre definidos.
+    resolver: zodT(categorySchema.omit({ isActive: true })) as unknown as Resolver<Form>,
     defaultValues: { type: 2 as const, color: 'var(--fp-primary)', icon: 'mdi-tag' },
   });
 
   const items = (list.data ?? []).filter(
     (c) => (filter === 'all' || String(c.type) === filter) && c.name.toLowerCase().includes(search.toLowerCase()),
   );
-  const err = (m: any) => m?.message ?? 'Error';
+  const err = (m: unknown) => (m as { message?: string } | null)?.message ?? 'Error';
 
   const close = () => { setShowForm(false); setEditing(null); reset(); };
   const openCreate = () => { setEditing(null); reset(); setShowForm(true); };
   const openEdit = (c: Category) => {
     setEditing(c);
-    setValue('name', c.name); setValue('type', c.type); setValue('icon', c.icon); setValue('color', c.color);
+    setValue('name', c.name); setValue('type', c.type as 1 | 2); setValue('icon', c.icon); setValue('color', c.color);
     setShowForm(true);
   };
-  const submit = (f: any) => {
+  const submit = (f: Form) => {
     if (editing) update.mutate({ id: editing.id, v: f }, { onSuccess: close });
-    else create.mutate({ ...f, isActive: true } as any, { onSuccess: close });
+    else create.mutate({ ...f, isActive: true }, { onSuccess: close });
   };
 
   if (list.isPending) return <Skeleton />;
@@ -66,7 +67,7 @@ export default function CategoriesPage() {
       />
 
       <div className="toolbar">
-        <select value={filter} onChange={(e) => setFilter(e.target.value as any)} aria-label={t('common.filter')}>
+        <select value={filter} onChange={(e) => setFilter(e.target.value as 'all' | '1' | '2')} aria-label={t('common.filter')}>
           <option value="all">{t('common.all')}</option><option value="1">{t('categories.income')}</option><option value="2">{t('categories.expense')}</option>
         </select>
         <label className="search">
@@ -80,7 +81,7 @@ export default function CategoriesPage() {
           <div className="field">
             <label htmlFor="cat-name">{t('common.name')}</label>
             <input id="cat-name" {...register('name')} />
-            {errors.name && <p className="field__error">{String((errors.name as any)?.message)}</p>}
+            {errors.name && <p className="field__error">{errors.name.message}</p>}
           </div>
           <div className="field">
             <label htmlFor="cat-type">{t('common.type')}</label>
@@ -91,7 +92,7 @@ export default function CategoriesPage() {
           <div className="field">
             <label htmlFor="cat-icon">{t('common.icon')}</label>
             <input id="cat-icon" {...register('icon')} placeholder="mdi-tag" />
-            {errors.icon && <p className="field__error">{String((errors.icon as any)?.message)}</p>}
+            {errors.icon && <p className="field__error">{errors.icon.message}</p>}
           </div>
           {(create.isError || update.isError) && <p className="error-text">{err(create.error ?? update.error)}</p>}
           <div className="form-actions">

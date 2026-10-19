@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
-import { budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf } from '@financial/core';
+import { budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf, type BudgetForm } from '@financial/core';
 import { listCategories } from '@financial/core';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
@@ -20,8 +20,8 @@ export default function BudgetsPage() {
   const inv = () => qc.invalidateQueries({ queryKey: ['budgets'] });
   const create = useMutation({ mutationFn: createBudget, onSuccess: inv });
   const remove = useMutation({ mutationFn: deleteBudget, onSuccess: inv });
-  const { register, handleSubmit, reset } = useForm<any>({
-    resolver: zodT(budgetSchema as any) as any,
+  const { register, handleSubmit, reset } = useForm<BudgetForm>({
+    resolver: zodT(budgetSchema),
     defaultValues: { month: now.getMonth() + 1, year: now.getFullYear() },
   });
   const catName = (id: number) => cats.data?.find((c) => c.id === Number(id))?.name ?? `#${id}`;
@@ -42,7 +42,7 @@ export default function BudgetsPage() {
       />
 
       <Modal open={showForm} onClose={close} title={t('common.create')}>
-        <form onSubmit={handleSubmit((f: any) => create.mutate(f as any, { onSuccess: close }))}>
+        <form onSubmit={handleSubmit((f) => create.mutate(f, { onSuccess: close }))}>
           <div className="field">
             <label htmlFor="bgt-cat">{t('common.category')}</label>
             <select id="bgt-cat" {...register('categoryId', { valueAsNumber: true })}>

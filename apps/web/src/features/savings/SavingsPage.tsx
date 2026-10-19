@@ -98,7 +98,7 @@ export default function SavingsPage() {
         <div className="table-wrap"><table className="ledger">
           <thead><tr><th>{t('common.date')}</th><th>{t('common.description')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th></tr></thead>
           <tbody>
-            {txs.map((tx: any) => (
+            {txs.map((tx) => (
               <tr key={tx.id} data-sign={tx.transactionType === 1 ? 'in' : 'out'}>
                 <td>{String(tx.date).slice(0, 10)}</td>
                 <td>{tx.description}</td>

@@ -37,7 +37,7 @@ export default function TransactionsPage() {
         <select value={cardId} onChange={(e) => setCardId(e.target.value)} aria-label={t('tx.merchant')}>
           <option value="all">{t('tx.all')}</option>
           <option value="cash">{t('tx.cash')}</option>
-          {(Array.isArray(cards.data) ? cards.data : []).map((c: any) => (
+          {(Array.isArray(cards.data) ? cards.data : []).map((c) => (
             <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>
           ))}
         </select>
@@ -57,7 +57,7 @@ export default function TransactionsPage() {
           rows={items.map((x) => ({
             ...x,
             date: kindOf(x),
-            merchant: (x.merchant as any)?.name ?? (x.merchantId ? `#${x.merchantId}` : '—'),
+            merchant: x.merchant?.name ?? (x.merchantId ? `#${x.merchantId}` : '—'),
             amount: Number(x.amount).toFixed(2),
           }))}
           searchKeys={['merchant', 'description']}

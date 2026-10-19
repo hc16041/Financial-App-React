@@ -92,12 +92,14 @@ function Raw({ data }: { data: unknown }) {
 
 // monthlySummaries del backend → series del gráfico (tolerante a PascalCase).
 function monthly(d: unknown): { months: string[]; income: number[]; expense: number[] } | null {
-  const rows = (d as any)?.monthlySummaries ?? (d as any)?.MonthlySummaries;
+  const src = (d ?? {}) as Record<string, unknown>;
+  const rows = src.monthlySummaries ?? src.MonthlySummaries;
   if (!Array.isArray(rows) || rows.length === 0) return null;
+  const cells = rows as Record<string, unknown>[];
   return {
-    months: rows.map((r: any) => String(r.monthName ?? r.MonthName ?? r.month ?? '')),
-    income: rows.map((r: any) => Number(r.totalIngresos ?? r.TotalIngresos ?? 0)),
-    expense: rows.map((r: any) => Number(r.totalRetiros ?? r.TotalRetiros ?? 0)),
+    months: cells.map((r) => String(r.monthName ?? r.MonthName ?? r.month ?? '')),
+    income: cells.map((r) => Number(r.totalIngresos ?? r.TotalIngresos ?? 0)),
+    expense: cells.map((r) => Number(r.totalRetiros ?? r.TotalRetiros ?? 0)),
   };
 }
 
@@ -124,7 +126,7 @@ export default function ReportsPage() {
     <section>
       <PageHead title={t('reports.title')} />
       <div className="toolbar">
-        <select value={kind} onChange={(e) => setKind(e.target.value as any)} aria-label={t('common.filter')}>
+        <select value={kind} onChange={(e) => setKind(e.target.value as 'merchants' | 'cash' | 'investments')} aria-label={t('common.filter')}>
           <option value="merchants">{t('reports.merchants')}</option>
           <option value="cash">{t('reports.cash')}</option>
           <option value="investments">{t('reports.investments')}</option>

@@ -9,7 +9,7 @@ import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
 import { accountSchema, txSchema, listAccounts, createAccount, listTx, createTx } from '@financial/core';
-import type { TxFilters } from '@financial/core';
+import type { TxFilters, AccountForm, PersonalTxForm } from '@financial/core';
 import { listCategories } from '@financial/core';
 
 export default function AccountsPage() {
@@ -24,9 +24,9 @@ export default function AccountsPage() {
   const inv = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['ptx'] }); };
   const addAcc = useMutation({ mutationFn: createAccount, onSuccess: inv });
   const addTx = useMutation({ mutationFn: createTx, onSuccess: inv });
-  const fAcc = useForm<any>({ resolver: zodT(accountSchema.omit({ isActive: true }) as any) as any });
-  const fTx = useForm<any>({
-    resolver: zodT(txSchema as any) as any,
+  const fAcc = useForm<AccountForm>({ resolver: zodT(accountSchema) });
+  const fTx = useForm<PersonalTxForm>({
+    resolver: zodT(txSchema),
     defaultValues: { date: new Date().toISOString().slice(0, 10), type: 2 },
   });
   const catName = (id: number) => cats.data?.find((c) => c.id === Number(id))?.name ?? `#${id}`;
@@ -58,7 +58,7 @@ export default function AccountsPage() {
       </ul>
 
       <Modal open={showAcc} onClose={closeAcc} title={t('accounts.newAccount')}>
-        <form onSubmit={fAcc.handleSubmit((f: any) => addAcc.mutate(f as any, { onSuccess: closeAcc }))}>
+        <form onSubmit={fAcc.handleSubmit((f) => addAcc.mutate(f, { onSuccess: closeAcc }))}>
           <div className="field">
             <label htmlFor="acc-name">{t('common.name')}</label>
             <input id="acc-name" {...fAcc.register('name')} />
@@ -76,7 +76,7 @@ export default function AccountsPage() {
       </Modal>
 
       <Modal open={showTx} onClose={closeTx} title={t('accounts.movement')}>
-        <form onSubmit={fTx.handleSubmit((f: any) => addTx.mutate(f as any, { onSuccess: closeTx }))}>
+        <form onSubmit={fTx.handleSubmit((f) => addTx.mutate(f, { onSuccess: closeTx }))}>
           <div className="field">
             <label htmlFor="tx-acc">{t('nav.accounts')}</label>
             <select id="tx-acc" {...fTx.register('accountId', { valueAsNumber: true })}>
