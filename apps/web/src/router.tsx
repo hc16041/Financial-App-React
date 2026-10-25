@@ -24,6 +24,8 @@ const carRoute = createRoute({ getParentRoute: () => root, path: '/cards', befor
 const repRoute = createRoute({ getParentRoute: () => root, path: '/reports', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/reports/ReportsPage')) });
 const txRoute = createRoute({ getParentRoute: () => root, path: '/tx', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/transactions/TransactionsPage')) });
 const invRoute = createRoute({ getParentRoute: () => root, path: '/invest', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/investments/InvestmentsPage')) });
+const platRoute = createRoute({ getParentRoute: () => root, path: '/platforms', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/refs/RefCatalogPage'), 'PlatformsPage') });
+const wmRoute = createRoute({ getParentRoute: () => root, path: '/withdrawal-methods', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/refs/RefCatalogPage'), 'WithdrawalMethodsPage') });
 const catRoute = createRoute({ getParentRoute: () => root, path: '/categories', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/categories/CategoriesPage')) });
 const budRoute = createRoute({ getParentRoute: () => root, path: '/budgets', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/budgets/BudgetsPage')) });
 const accRoute = createRoute({ getParentRoute: () => root, path: '/accounts', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/accounts/AccountsPage')) });
@@ -39,5 +41,5 @@ const cenPermissionsRoute = cen('/centries/permissions', 'CentriesPermisos');
 const cenAuditRoute = cen('/centries/audit', 'CentriesBitacora');
 
 export const router = createRouter({
-  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, savRoute, merRoute, carRoute, txRoute, invRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
+  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, savRoute, merRoute, carRoute, txRoute, invRoute, platRoute, wmRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
 });

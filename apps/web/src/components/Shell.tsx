@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowRightLeft, BarChart3, BookMarked, Briefcase, ChevronDown, CreditCard, Fingerprint,
-  Globe, KeyRound, Landmark, LayoutDashboard, LogOut, Maximize2, Menu, Minimize2, Moon,
+  ArrowRightLeft, Banknote, BarChart3, BookMarked, Briefcase, ChevronDown, CreditCard, Fingerprint,
+  Globe, KeyRound, Landmark, Layers, LayoutDashboard, LogOut, Maximize2, Menu, Minimize2, Moon,
   PiggyBank, ScrollText, ShieldCheck, Store, Sun, Tags, Target, TrendingUp, User,
   Users, UserX, Wallet, type LucideIcon,
 } from 'lucide-react';
@@ -22,6 +22,8 @@ const SECTIONS: { key: string; items: Item[] }[] = [
   ] },
   { key: 'order', items: [
     { to: '/categories', key: 'categories', icon: Tags },
+    { to: '/platforms', key: 'platforms', icon: Layers },
+    { to: '/withdrawal-methods', key: 'withdrawalMethods', icon: Banknote },
     { to: '/budgets', key: 'budgets', icon: Wallet },
     { to: '/goals', key: 'goals', icon: Target },
   ] },

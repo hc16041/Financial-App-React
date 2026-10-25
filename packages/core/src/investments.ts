@@ -29,7 +29,3 @@ export type InvestmentForm = z.infer<typeof investmentSchema>;
 export const createInvestment = (b: InvestmentForm) => apiPost<number>(`/api/Investments`, b);
 export const updateInvestment = (id: number, b: InvestmentForm) => apiPut<boolean>(`/api/Investments/${id}`, { ...b, id });
 export const deleteInvestment = (id: number) => apiDel<void>(`/api/Investments/${id}`);
-
-export type Ref = { id: number; name: string };
-export const listPlatforms = () => apiGet<Ref[]>(`/api/Platforms`);
-export const listWithdrawalMethods = () => apiGet<Ref[]>(`/api/WithdrawalMethods`);
