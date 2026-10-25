@@ -1,15 +1,47 @@
 // Único fetch contra .NET. Dinero siempre string, fechas ISO UTC.
-// Sin DOM en import (RN-safe): storage solo dentro de funciones.
-const BASE = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:5063';
+// Portable: sin DOM, sin `location`, sin `import.meta`. La app configura
+// baseUrl, storage y el callback de 401 al arrancar, así el mismo código corre
+// en la web y en React Native.
 
-const mem: Record<string, string> = {};
-const store = () =>
-  typeof sessionStorage !== 'undefined'
-    ? sessionStorage
-    : { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v; }, removeItem: (k: string) => { delete mem[k]; } };
+import type { KeyValue } from './storage';
+
+const mem = new Map<string, string>();
+const memoryStore: KeyValue = {
+  getItem: (k) => mem.get(k) ?? null,
+  setItem: (k, v) => { mem.set(k, v); },
+  removeItem: (k) => { mem.delete(k); },
+};
+
+// Por defecto sessionStorage (comportamiento histórico de la web); en RN la app
+// inyecta SecureStore/AsyncStorage. Si no hay ninguno, memoria.
+let sessionOverride: KeyValue | null = null;
+export const sessionStore = (): KeyValue => {
+  if (sessionOverride) return sessionOverride;
+  if (typeof sessionStorage !== 'undefined') return sessionStorage;
+  return memoryStore;
+};
+
+let baseUrl = 'http://localhost:5063';
+let onUnauthorized: (() => void) | null = null;
+
+export type ApiConfig = {
+  baseUrl?: string;
+  storage?: KeyValue;
+  /** Qué hacer ante un 401. La web redirige al login; RN limpia la sesión. */
+  onUnauthorized?: () => void;
+};
+
+export const configureApi = (config: ApiConfig) => {
+  if (config.baseUrl) baseUrl = config.baseUrl.replace(/\/+$/, '');
+  if (config.storage) sessionOverride = config.storage;
+  if (config.onUnauthorized) onUnauthorized = config.onUnauthorized;
+};
+
+export const getBaseUrl = () => baseUrl;
+
 export const setToken = (t: string | null) =>
-  t ? store().setItem('fa_token', t) : store().removeItem('fa_token');
-export const getToken = () => store().getItem('fa_token');
+  t ? sessionStore().setItem('fa_token', t) : sessionStore().removeItem('fa_token');
+export const getToken = () => sessionStore().getItem('fa_token');
 
 export class ApiError extends Error {
   status: number;
@@ -22,18 +54,16 @@ export class ApiError extends Error {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const token = getToken();
+  const res = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
-  if (res.status === 401 && typeof location !== 'undefined' && !location.pathname.startsWith('/auth/')) {
-    setToken(null);
-    location.href = '/auth/login';
-  }
+  if (res.status === 401) onUnauthorized?.();
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, body?.code, body?.message ?? body?.title ?? `HTTP ${res.status}`);

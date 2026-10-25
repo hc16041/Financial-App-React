@@ -1,11 +1,11 @@
 import { createRootRoute, createRoute, createRouter, redirect, lazyRouteComponent } from '@tanstack/react-router';
+import { getToken } from '@financial/core';
 import LoginPage from './features/auth/LoginPage';
 import DashboardPage from './features/dashboard/DashboardPage';
 import Shell from './components/Shell';
 
 const authed = () => {
-  if (typeof sessionStorage === 'undefined') return true;
-  if (!sessionStorage.getItem('fa_token')) throw redirect({ to: '/auth/login' });
+  if (!getToken()) throw redirect({ to: '/auth/login' });
 };
 
 const root = createRootRoute({ component: Shell });
