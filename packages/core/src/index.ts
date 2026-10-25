@@ -15,3 +15,4 @@ export * from './reports';
 export * from './transactions';
 export * from './investments';
 export * from './refs';
+export * from './loans';

@@ -30,6 +30,7 @@ const catRoute = createRoute({ getParentRoute: () => root, path: '/categories', 
 const budRoute = createRoute({ getParentRoute: () => root, path: '/budgets', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/budgets/BudgetsPage')) });
 const accRoute = createRoute({ getParentRoute: () => root, path: '/accounts', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/accounts/AccountsPage')) });
 const goaRoute = createRoute({ getParentRoute: () => root, path: '/goals', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/goals/GoalsPage')) });
+const loanRoute = createRoute({ getParentRoute: () => root, path: '/loans', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/loans/LoansPage')) });
 // Centries (Módulo 8): páginas config-driven sobre mocks locales.
 type CentryExport = 'CentriesUsuarios' | 'CentriesUsuariosInactivos' | 'CentriesPerfiles' | 'CentriesCargos' | 'CentriesPermisos' | 'CentriesBitacora';
 const cen = (path: string, name: CentryExport) => createRoute({ getParentRoute: () => root, path, beforeLoad: authed, component: lazyRouteComponent(() => import('./features/centries/CentriesPage'), name) });
@@ -41,5 +42,5 @@ const cenPermissionsRoute = cen('/centries/permissions', 'CentriesPermisos');
 const cenAuditRoute = cen('/centries/audit', 'CentriesBitacora');
 
 export const router = createRouter({
-  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, savRoute, merRoute, carRoute, txRoute, invRoute, platRoute, wmRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
+  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, savRoute, merRoute, carRoute, txRoute, invRoute, platRoute, wmRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, loanRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
 });
