@@ -4,14 +4,15 @@ import { useForm } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
-import { budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf, type BudgetForm } from '@financial/core';
+import { budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf, money, type BudgetForm } from '@financial/core';
 import { listCategories } from '@financial/core';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { monthYear } from '../../lib/date';
 
 export default function BudgetsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const now = new Date();
   const [showForm, setShowForm] = useState(false);
@@ -76,9 +77,9 @@ export default function BudgetsPage() {
             {items.map((b) => (
               <tr key={b.id}>
                 <td>{b.categoryName ?? catName(b.categoryId)}</td>
-                <td>{b.month}/{b.year}</td>
-                <td className="ledger-figure">{Number(b.limit).toFixed(2)}</td>
-                <td className="ledger-figure">{Number(b.spent).toFixed(2)}</td>
+                <td>{monthYear(b.month, b.year, i18n.language)}</td>
+                <td className="ledger-figure">{money(b.limit)}</td>
+                <td className="ledger-figure">{money(b.spent)}</td>
                 <td style={{ color: color(stateOf(b)) }}>{pct(b)}%</td>
                 <td><button className="btn btn--sm btn--danger" onClick={() => remove.mutate(b.id)} title={t('common.delete')} aria-label={t('common.delete')}><Trash2 size={15} aria-hidden="true" /></button></td>
               </tr>

@@ -8,12 +8,13 @@ import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
-import { accountSchema, txSchema, listAccounts, createAccount, listTx, createTx } from '@financial/core';
+import { fmtDate } from '../../lib/date';
+import { accountSchema, txSchema, listAccounts, createAccount, listTx, createTx, money } from '@financial/core';
 import type { TxFilters, AccountForm, PersonalTxForm } from '@financial/core';
 import { listCategories } from '@financial/core';
 
 export default function AccountsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [showAcc, setShowAcc] = useState(false);
   const [showTx, setShowTx] = useState(false);
@@ -53,7 +54,7 @@ export default function AccountsPage() {
 
       <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 var(--fp-space-4)', display: 'flex', flexWrap: 'wrap', gap: 'var(--fp-space-2)' }}>
         {(accs.data ?? []).map((a) => (
-          <li key={a.id} className="card" style={{ padding: 'var(--fp-space-2) var(--fp-space-3)' }}>{a.name} ({a.type === 1 ? t('accounts.cash') : t('accounts.bank')}) — <span className="ledger-figure">{Number(a.balance).toFixed(2)}</span></li>
+          <li key={a.id} className="card" style={{ padding: 'var(--fp-space-2) var(--fp-space-3)' }}>{a.name} ({a.type === 1 ? t('accounts.cash') : t('accounts.bank')}) — <span className="ledger-figure">{money(a.balance)}</span></li>
         ))}
       </ul>
 
@@ -135,15 +136,15 @@ export default function AccountsPage() {
           <option value="">{t('common.all')} — {t('common.category')}</option>
           {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" aria-label={`${t('common.date')} (desde)`} title={`${t('common.date')} (desde)`} value={filters.from ?? ''} onChange={(e) => setFilters({ ...filters, from: e.target.value || undefined })} />
-        <input type="date" aria-label={`${t('common.date')} (hasta)`} title={`${t('common.date')} (hasta)`} value={filters.to ?? ''} onChange={(e) => setFilters({ ...filters, to: e.target.value || undefined })} />
+        <input type="date" aria-label={t('common.from')} title={t('common.from')} value={filters.from ?? ''} onChange={(e) => setFilters({ ...filters, from: e.target.value || undefined })} />
+        <input type="date" aria-label={t('common.to')} title={t('common.to')} value={filters.to ?? ''} onChange={(e) => setFilters({ ...filters, to: e.target.value || undefined })} />
         <button className="btn btn--sm" onClick={() => setFilters({})}>{t('common.clear')}</button>
       </div>
 
       <div className="table-wrap"><table className="ledger">
         <thead><tr><th>{t('common.date')}</th><th>{t('nav.accounts')}</th><th>{t('common.category')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th></tr></thead>
         <tbody>{(txs.data ?? []).map((tx) => (
-          <tr key={tx.id} data-sign={tx.type === 1 ? 'in' : 'out'}><td>{tx.date.slice(0, 10)}</td><td>{tx.accountName ?? accName(tx.accountId)}</td><td>{tx.categoryId ? catName(tx.categoryId) : '—'}</td><td>{tx.type === 1 ? t('categories.income') : t('categories.expense')}</td><td className="ledger-figure">{Number(tx.amount).toFixed(2)}</td></tr>
+          <tr key={tx.id} data-sign={tx.type === 1 ? 'in' : 'out'}><td>{fmtDate(tx.date, i18n.language)}</td><td>{tx.accountName ?? accName(tx.accountId)}</td><td>{tx.categoryId ? catName(tx.categoryId) : '—'}</td><td>{tx.type === 1 ? t('categories.income') : t('categories.expense')}</td><td className="ledger-figure">{money(tx.amount)}</td></tr>
         ))}</tbody>
       </table></div>
       {(txs.data ?? []).length === 0 && <p className="empty-state">{t('accounts.empty')}</p>}

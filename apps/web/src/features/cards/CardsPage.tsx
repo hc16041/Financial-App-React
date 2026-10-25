@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
-import { listCards, getCardsSummary, getCardsConsumption, createCard, cardSchema, type CardForm } from '@financial/core';
+import { listCards, getCardsSummary, getCardsConsumption, createCard, cardSchema, money, type CardForm } from '@financial/core';
 import { NameValueBars } from '../../components/Charts';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
@@ -31,7 +31,7 @@ export default function CardsPage() {
 
   const close = () => { setShowForm(false); reset(); };
   // Columnas camelCase/PascalCase del API: se muestran como vienen.
-  const cell = (v: unknown) => (v == null || v === '' ? '�' : String(v));
+  const cell = (v: unknown) => money(v as number | string | null | undefined);
 
   if (sum.isPending || cards.isPending) return <Skeleton rows={4} />;
   if (sum.isError || cards.isError)
@@ -46,9 +46,9 @@ export default function CardsPage() {
       />
 
       <div className="balance-strip">
-        <div className="balance-strip__total ledger-figure">{Number(sum.data?.totalCurrentBalance ?? 0).toFixed(2)}</div>
+        <div className="balance-strip__total ledger-figure">{money(sum.data?.totalCurrentBalance ?? 0)}</div>
         <p style={{ color: 'var(--fp-text-muted)', margin: 'var(--fp-space-1) 0 0' }}>
-          {t('cards.limit')}: {Number(sum.data?.totalCreditLimit ?? 0).toFixed(2)} · {t('cards.available')}: {Number(sum.data?.totalAvailableCredit ?? 0).toFixed(2)}
+          {t('cards.limit')}: {money(sum.data?.totalCreditLimit ?? 0)} · {t('cards.available')}: {money(sum.data?.totalAvailableCredit ?? 0)}
         </p>
       </div>
 
@@ -101,12 +101,14 @@ export default function CardsPage() {
 
       <h3 style={{ marginTop: 'var(--fp-space-4)' }}>{t('cards.consumption')}</h3>
       {cons.isPending ? <Skeleton rows={3} /> : consItems.length === 0 ? <p className="empty-state">{t('common.empty')}</p> : (
-        <NameValueBars
-          names={consItems.map((r, i) => String(r.cardName ?? r.name ?? r.cardId ?? `#${i}`))}
-          values={consItems.map((r) => Number(r.total ?? r.amount ?? 0))}
-          color="var(--fp-danger)"
-          ariaLabel={t('cards.chartAria')}
-        />
+        <div className="card">
+          <NameValueBars
+            names={consItems.map((r, i) => String(r.cardName ?? r.name ?? r.cardId ?? `#${i}`))}
+            values={consItems.map((r) => Number(r.total ?? r.amount ?? 0))}
+            color="var(--fp-danger)"
+            ariaLabel={t('cards.chartAria')}
+          />
+        </div>
       )}
     </section>
   );

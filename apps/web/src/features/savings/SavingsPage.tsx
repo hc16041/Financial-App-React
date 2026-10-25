@@ -3,18 +3,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ListChecks, Plus } from 'lucide-react';
 import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
+import KpiCard from '../../components/KpiCard';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { fmtDate } from '../../lib/date';
 import {
-  getBalance, getHistory, postTx, normBalance,
+  getBalance, getHistory, postTx, normBalance, money, sumMoney,
   savingTxSchema, type SavingTxForm,
 } from '@financial/core';
 
 export default function SavingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const bal = useQuery({ queryKey: ['savings', 'balance'], queryFn: getBalance, retry: false });
@@ -34,6 +36,7 @@ export default function SavingsPage() {
 
   const balance = normBalance(bal.data);
   const txs = Array.isArray(hist.data) ? hist.data : [];
+  const sumOf = (type: 1 | 2) => sumMoney(txs.filter((x) => x.transactionType === type).map((x) => String(x.amount)));
   const close = () => { setShowForm(false); reset(); };
 
   if (bal.isPending || hist.isPending) return <Skeleton />;
@@ -51,11 +54,17 @@ export default function SavingsPage() {
         title={t('savings.title')}
         actions={
           <>
-            <span className="badge">{t('savings.balance')}: <span className="ledger-figure">{balance ?? '—'}</span></span>
+            <span className="badge">{t('savings.balance')}: <span className="ledger-figure">{money(balance)}</span></span>
             <button className="btn btn--primary" onClick={() => setShowForm(true)}><Plus size={16} aria-hidden="true" />{t('savings.new')}</button>
           </>
         }
       />
+
+      <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
+        <KpiCard label={t('savings.deposits')} value={money(sumOf(1))} tone="in" icon={ArrowDownToLine} />
+        <KpiCard label={t('savings.withdrawals')} value={money(sumOf(2))} tone="out" icon={ArrowUpFromLine} />
+        <KpiCard label={t('savings.movements')} value={String(txs.length)} icon={ListChecks} />
+      </div>
 
       <Modal open={showForm} onClose={close} title={t('savings.new')}>
         <form onSubmit={handleSubmit((f) => mut.mutate(f, { onSuccess: () => reset() }))}>
@@ -100,10 +109,10 @@ export default function SavingsPage() {
           <tbody>
             {txs.map((tx) => (
               <tr key={tx.id} data-sign={tx.transactionType === 1 ? 'in' : 'out'}>
-                <td>{String(tx.date).slice(0, 10)}</td>
+                <td>{fmtDate(tx.date, i18n.language)}</td>
                 <td>{tx.description}</td>
                 <td>{tx.transactionType === 1 ? t('savings.deposit') : t('savings.withdrawal')}</td>
-                <td className="ledger-figure">{tx.amount}</td>
+                <td className="ledger-figure">{money(tx.amount)}</td>
               </tr>
             ))}
           </tbody>

@@ -6,15 +6,16 @@ import { useTranslation } from 'react-i18next';
 import { Pause, Pencil, Play, Plus, Receipt } from 'lucide-react';
 import {
   goalSchema, recurringSchema, listGoals, createGoal, updateGoal, depositGoal,
-  listRecurring, createRecurring, toggleRecurring, payRecurring, listAccounts,
+  listRecurring, createRecurring, toggleRecurring, payRecurring, listAccounts, money,
   type Goal, type GoalForm, type RecurringForm,
 } from '@financial/core';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { fmtDate } from '../../lib/date';
 
 export default function GoalsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [showGoal, setShowGoal] = useState(false);
   const [showRec, setShowRec] = useState(false);
@@ -120,7 +121,7 @@ export default function GoalsPage() {
           <div className="field">
             <label htmlFor="goal-account">{t('nav.accounts')}</label>
             <select id="goal-account" {...fC.register('accountId', { valueAsNumber: true })} defaultValue={accs.data?.[0]?.id}>
-              {(accs.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name} — {Number(a.balance).toFixed(2)}</option>)}
+              {(accs.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name} — {money(a.balance)}</option>)}
             </select>
           </div>
           <div className="field">
@@ -140,7 +141,7 @@ export default function GoalsPage() {
           <div className="field">
             <label htmlFor="pay-account">{t('nav.accounts')}</label>
             <select id="pay-account" {...fP.register('accountId', { valueAsNumber: true })} defaultValue={accs.data?.[0]?.id}>
-              {(accs.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name} — {Number(a.balance).toFixed(2)}</option>)}
+              {(accs.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name} — {money(a.balance)}</option>)}
             </select>
           </div>
           {payR.isError && <p className="error-text">{(payR.error as Error)?.message}</p>}
@@ -167,7 +168,7 @@ export default function GoalsPage() {
               </div>
               <div className="progress"><span className="progress__bar" style={{ width: `${progress(g)}%` }} /></div>
               <div className="row-between" style={{ marginTop: 'var(--fp-space-2)' }}>
-                <span className="ledger-figure" style={{ color: 'var(--fp-text-muted)' }}>{Number(g.current).toFixed(2)} / {Number(g.target).toFixed(2)}{g.deadline ? ` · ${String(g.deadline).slice(0, 10)}` : ''}</span>
+                <span className="ledger-figure" style={{ color: 'var(--fp-text-muted)' }}>{money(g.current)} / {money(g.target)}{g.deadline ? ` · ${fmtDate(g.deadline, i18n.language)}` : ''}</span>
                 {!g.closed && <button className="btn btn--sm" onClick={() => setGoalId(g.id)} disabled={!hasAccounts}><Plus size={15} aria-hidden="true" />{t('goals.contribute')}</button>}
               </div>
             </li>
@@ -208,7 +209,7 @@ export default function GoalsPage() {
             <li key={r.id} className="card row-between">
               <span>
                 <strong>{r.name}</strong>
-                <span style={{ color: 'var(--fp-text-muted)' }}> — <span className="ledger-figure">{Number(r.amount).toFixed(2)}</span> {r.frequencyName ?? r.frequency} · {t('goals.due')} {r.nextDue?.slice(0, 10)}</span>
+                <span style={{ color: 'var(--fp-text-muted)' }}> — <span className="ledger-figure">{money(r.amount)}</span> {r.frequencyName ?? r.frequency} · {t('goals.due')} {fmtDate(r.nextDue, i18n.language)}</span>
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--fp-space-2)' }}>
                 <span className={`badge ${r.active ? 'badge--in' : ''}`}>{r.active ? t('goals.active') : t('goals.paused')}</span>

@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { money } from '@financial/core';
 import { ChevronLeft, ChevronRight, Inbox, Search } from 'lucide-react';
 
 export type Column = {
@@ -49,7 +50,11 @@ export default function DataTable({ columns, rows, searchKeys = [], signKey, pag
                   <tr key={i} data-sign={sign(r)}>
                     {columns.map((c) => (
                       <td key={c.key} className={c.figure ? 'ledger-figure' : undefined}>
-                        {c.render ? c.render(r) : String(r[c.key] ?? '—').slice(0, 60)}
+                        {c.render
+                          ? c.render(r)
+                          : c.figure
+                            ? money(r[c.key] as number | string)
+                            : String(r[c.key] ?? '—').slice(0, 60)}
                       </td>
                     ))}
                     {renderActions && <td style={{ whiteSpace: 'nowrap' }}>{renderActions(r)}</td>}

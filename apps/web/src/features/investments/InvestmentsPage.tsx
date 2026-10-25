@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Pencil, Plus, Trash2, TrendingUp } from 'lucide-react';
 import {
   listInvestments, createInvestment, updateInvestment, deleteInvestment,
-  listPlatforms, listWithdrawalMethods, investmentSchema, type Investment, type InvestmentForm,
+  platformsApi, withdrawalMethodsApi, investmentSchema, money, type Investment, type InvestmentForm,
 } from '@financial/core';
 import { listCards } from '@financial/core';
 import KpiCard from '../../components/KpiCard';
@@ -21,8 +21,8 @@ export default function InvestmentsPage() {
   const [editing, setEditing] = useState<Investment | null>(null);
   const [showForm, setShowForm] = useState(false);
   const q = useQuery({ queryKey: ['investments'], queryFn: listInvestments, retry: false });
-  const plats = useQuery({ queryKey: ['platforms'], queryFn: listPlatforms });
-  const methods = useQuery({ queryKey: ['withdrawalMethods'], queryFn: listWithdrawalMethods });
+  const plats = useQuery({ queryKey: ['platforms'], queryFn: platformsApi.list });
+  const methods = useQuery({ queryKey: ['withdrawalMethods'], queryFn: withdrawalMethodsApi.list });
   const cards = useQuery({ queryKey: ['cards', 'list'], queryFn: listCards, retry: false });
   const inv = () => qc.invalidateQueries({ queryKey: ['investments'] });
   const create = useMutation({ mutationFn: createInvestment, onSuccess: inv });
@@ -69,7 +69,7 @@ export default function InvestmentsPage() {
       />
 
       <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
-        <KpiCard label={t('invest.total')} value={total.toFixed(2)} tone="in" icon={TrendingUp} />
+        <KpiCard label={t('invest.total')} value={money(total)} tone="in" icon={TrendingUp} />
       </div>
 
       <Modal open={showForm} onClose={close} title={editing ? t('common.edit') : t('common.create')}>
@@ -137,9 +137,9 @@ export default function InvestmentsPage() {
             platform: (x.platformName ?? `#${x.platformId}`) as string,
             date: String(x.transactionDate ?? '').slice(0, 10),
             kind: Number(x.transactionType) === 2 ? t('invest.income') : t('invest.withdraw'),
-            amount: Number(x.amount).toFixed(2),
-            commission: Number(x.commission).toFixed(2),
-            total: Number(x.total).toFixed(2),
+            amount: x.amount,
+            commission: x.commission,
+            total: x.total,
           }))}
           searchKeys={['platform']}
           emptyText={t('common.empty')}

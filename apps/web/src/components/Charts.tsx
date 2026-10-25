@@ -1,5 +1,7 @@
 // Barras SVG propias: verde ingreso, ladrillo gasto, cobre neto.
 // Sin librerías (Apex pesaba 955KB por dos gráficos).
+import { money } from '@financial/core';
+
 function bars(max: number, v: number, w: number) {
   return max > 0 ? Math.max(2, (v / max) * w) : 2;
 }
@@ -13,8 +15,8 @@ export function MonthlyBars({ months, income, expense, ariaLabel }: { months: st
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '4rem 1fr', gap: 8, alignItems: 'center', margin: '2px 0' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--fp-text-muted)' }}>{m}</span>
           <span style={{ display: 'flex', gap: 2 }}>
-            <span title={`${income[i]}`} style={{ display: 'inline-block', height: 12, width: bars(max, income[i], W), background: 'var(--fp-success)' }} />
-            <span title={`${expense[i]}`} style={{ display: 'inline-block', height: 12, width: bars(max, expense[i], W), background: 'var(--fp-danger)' }} />
+            <span title={money(income[i])} style={{ display: 'inline-block', height: 12, width: bars(max, income[i], W), background: 'var(--fp-success)' }} />
+            <span title={money(expense[i])} style={{ display: 'inline-block', height: 12, width: bars(max, expense[i], W), background: 'var(--fp-danger)' }} />
           </span>
         </div>
       ))}
@@ -51,7 +53,7 @@ export function Donut({ segments, ariaLabel, size = 148, thickness = 18 }: {
           <li key={i}>
             <span className="legend__dot" style={{ background: s.color }} />
             {s.name}
-            <span className="ledger-figure">{s.value.toFixed(2)}</span>
+            <span className="ledger-figure">{money(s.value)}</span>
           </li>
         ))}
       </ul>
@@ -67,7 +69,7 @@ export function NameValueBars({ names, values, color = 'var(--fp-success)', aria
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '8rem 1fr auto', gap: 8, alignItems: 'center', margin: '2px 0' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--fp-text-muted)' }}>{n}</span>
           <span style={{ display: 'inline-block', height: 12, width: bars(max, values[i], 280), background: color }} />
-          <span className="ledger-figure" style={{ fontSize: '0.8125rem' }}>{values[i].toFixed(2)}</span>
+          <span className="ledger-figure" style={{ fontSize: '0.8125rem' }}>{money(values[i])}</span>
         </div>
       ))}
     </div>

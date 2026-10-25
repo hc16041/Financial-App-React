@@ -290,7 +290,7 @@ label { font-size: 0.875rem; font-weight: 500; }
 .kpi__trend--up { color: var(--fp-success); }
 .kpi__trend--down { color: var(--fp-danger); }
 
-.grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--fp-space-3); }
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--fp-space-3); align-items: start; }
 @media (min-width: 48rem) {
   .grid-2 { grid-template-columns: 1fr 1fr; }
 }
@@ -386,6 +386,18 @@ label { font-size: 0.875rem; font-weight: 500; }
 
 /* ---------- Tabla libro-mayor ---------- */
 .table-wrap { overflow-x: auto; }
+/* En móvil la columna de acciones queda fija al borde derecho: editar y borrar
+   siguen alcanzables sin arrastrar la tabla a ciegas. Solo aplica a la última
+   columna cuando contiene botones, así no tapa datos (montos, totales). */
+@media (max-width: 47.99rem) {
+  table.ledger:has(tbody tr td:last-child button) th:last-child,
+  table.ledger tbody tr td:last-child:has(button) {
+    position: sticky;
+    right: 0;
+    background: var(--fp-surface);
+    border-left: 1px solid var(--fp-border);
+  }
+}
 table.ledger {
   width: 100%;
   border-collapse: collapse;
@@ -509,7 +521,7 @@ table.ledger tr[data-sign="out"] td:first-child { box-shadow: inset 3px 0 0 var(
 .topbar__spacer { flex: 1; }
 .topbar__actions { display: flex; align-items: center; gap: var(--fp-space-1); }
 .topbar__menu { display: none; }
-.topbar__brand { display: none; align-items: center; gap: var(--fp-space-2); font-weight: 700; letter-spacing: -0.02em; }
+.topbar__brand { display: none; align-items: center; gap: var(--fp-space-2); font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .topbar__brand .brand__mark { width: 1.6rem; height: 1.6rem; }
 
 /* Identidad de la sesión: nombre visible, acción de salida a un clic. */
