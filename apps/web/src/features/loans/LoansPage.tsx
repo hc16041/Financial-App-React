@@ -207,7 +207,7 @@ export default function LoansPage() {
         </form>
       </Modal>
 
-      <Modal open={projecting != null} onClose={() => setProjecting(null)} title={t('loans.projectionTitle')}>
+      <Modal open={projecting != null} onClose={() => setProjecting(null)} title={t('loans.projectionTitle')} wide>
         {projecting && (
           <ProjectionPanel
             loan={projecting}
