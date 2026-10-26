@@ -63,14 +63,18 @@ export const listTx = (f: TxFilters = {}) => {
   const qs = q.toString();
   return apiGet<PersonalTx[]>(`/api/accounts/transactions${qs ? `?${qs}` : ''}`);
 };
-export const createTx = (t: PersonalTxForm) => {
+export const createTx = (t: PersonalTxForm, opts?: { idempotencyKey?: string }) => {
   const v = txSchema.parse(t);
-  return apiPost<PersonalTx>('/api/accounts/transactions', {
-    accountId: v.accountId,
-    categoryId: v.categoryId ?? null,
-    type: v.type,
-    amount: Number(v.amount),
-    date: v.date,
-    note: v.note,
-  });
+  return apiPost<PersonalTx>(
+    '/api/accounts/transactions',
+    {
+      accountId: v.accountId,
+      categoryId: v.categoryId ?? null,
+      type: v.type,
+      amount: Number(v.amount),
+      date: v.date,
+      note: v.note,
+    },
+    opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : undefined,
+  );
 };

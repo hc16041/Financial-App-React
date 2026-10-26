@@ -27,6 +27,6 @@ export const getCardsConsumption = (from: string, to: string) =>
   apiGet<CardConsumption[]>(`/api/Reports/cards/consumption?startDate=${from}&endDate=${to}`);
 
 export type DashboardSummary = {
-  savings: number; cardDebt: number; investments: number; totalBalance: number; isProvisional: boolean;
+  savings: number; cardDebt: number; investments: number; loanDebt: number; totalBalance: number; isProvisional: boolean;
 };
 export const getDashboardSummary = () => apiGet<DashboardSummary>(`/api/dashboard/summary`);

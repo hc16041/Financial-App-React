@@ -66,11 +66,18 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) onUnauthorized?.();
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, body?.code, body?.message ?? body?.title ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    // ProblemDetails: el texto útil viaja en `detail`; `title` es genérico.
+    const msg = body?.detail ?? body?.message ?? body?.title ?? `HTTP ${res.status}`;
+    throw new ApiError(res.status, body?.code, msg);
+  }
   return body as T;
 }
 
-export const apiGet = <T>(p: string) => req<T>(p);
-export const apiPost = <T>(p: string, b: unknown) => req<T>(p, { method: 'POST', body: JSON.stringify(b) });
-export const apiPut = <T>(p: string, b: unknown) => req<T>(p, { method: 'PUT', body: JSON.stringify(b) });
-export const apiDel = <T>(p: string) => req<T>(p, { method: 'DELETE' });
+export const apiGet = <T>(p: string, headers?: Record<string, string>) => req<T>(p, { headers });
+export const apiPost = <T>(p: string, b: unknown, headers?: Record<string, string>) =>
+  req<T>(p, { method: 'POST', body: JSON.stringify(b), headers });
+export const apiPut = <T>(p: string, b: unknown, headers?: Record<string, string>) =>
+  req<T>(p, { method: 'PUT', body: JSON.stringify(b), headers });
+export const apiDel = <T>(p: string, headers?: Record<string, string>) =>
+  req<T>(p, { method: 'DELETE', headers });

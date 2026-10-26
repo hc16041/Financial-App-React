@@ -24,7 +24,7 @@ export default function AccountsPage() {
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => listCategories() });
   const inv = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['ptx'] }); };
   const addAcc = useMutation({ mutationFn: createAccount, onSuccess: inv });
-  const addTx = useMutation({ mutationFn: createTx, onSuccess: inv });
+  const addTx = useMutation({ mutationFn: (v: PersonalTxForm) => createTx(v), onSuccess: inv });
   const fAcc = useForm<AccountForm>({ resolver: zodT(accountSchema) });
   const fTx = useForm<PersonalTxForm>({
     resolver: zodT(txSchema),
