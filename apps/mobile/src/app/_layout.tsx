@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack, router, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
+import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { setToken, getToken, sessionStore, useAuth } from '@financial/core';
@@ -8,10 +8,15 @@ import { useTheme } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// Ruta actual, para que el callback de 401 no se dispare sobre el propio login:
+// un 401 del endpoint de login es "credenciales inválidas", no "sesión vencida".
+let currentPath = '';
+
 // Se configura antes de montar pantallas: el core no conoce el router.
 configureMobileApi(() => {
   setToken(null);
   useAuth.setState({ token: null, username: null });
+  if (currentPath.startsWith('/login')) return;
   router.replace('/login');
 });
 
@@ -25,6 +30,11 @@ const qc = new QueryClient({
 
 export default function RootLayout() {
   const { c, isDark } = useTheme();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    currentPath = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
