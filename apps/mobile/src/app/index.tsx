@@ -89,7 +89,17 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            <Text style={[s.section, { color: c.textMuted }]}>ÚLTIMOS MOVIMIENTOS</Text>
+            <View style={s.sectionRow}>
+              <Text style={[s.section, { color: c.textMuted }]}>ÚLTIMOS MOVIMIENTOS</Text>
+              <Pressable
+                onPress={() => router.push('/movements')}
+                accessibilityRole="button"
+                accessibilityLabel="Ver todos los movimientos"
+                hitSlop={8}
+              >
+                <Text style={[s.link, { color: c.primary }]}>Ver todos</Text>
+              </Pressable>
+            </View>
             {tx.isPending ? (
               <ActivityIndicator color={c.primary} />
             ) : recent.length === 0 ? (
@@ -149,6 +159,8 @@ export default function HomeScreen() {
 const s = StyleSheet.create({
   content: { padding: space[4], gap: space[2], paddingBottom: 100 },
   section: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: space[3] },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space[3] },
+  link: { fontSize: 13, fontWeight: '600' },
   grid: { flexDirection: 'row', gap: space[2] },
   balance: { borderWidth: 1, borderTopWidth: 3, borderRadius: radius.lg, padding: space[4], marginTop: space[2] },
   balanceLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },

@@ -3,11 +3,11 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import {
-  createAccount, createTx, listAccounts, listCategories,
+  createAccount, createTx, updateTx, listAccounts, listCategories, listTx,
   money, type Account, type Category,
 } from '@financial/core';
 import { todayIso } from '@/lib/date';
@@ -18,19 +18,39 @@ const MONEY = /^\d+(\.\d{1,2})?$/;
 export default function CaptureScreen() {
   const { c } = useTheme();
   const qc = useQueryClient();
+  const params = useLocalSearchParams<{ id?: string }>();
+  const editingId = params.id ? Number(params.id) : null;
+
+  const [loaded, setLoaded] = useState(false);
 
   const accounts = useQuery({ queryKey: ['accounts'], queryFn: listAccounts });
   const categories = useQuery({ queryKey: ['categories'], queryFn: () => listCategories() });
+
+  // En modo edición se carga el movimiento existente desde la lista ya cacheada.
+  const all = useQuery({ queryKey: ['tx', 'all'], queryFn: () => listTx({}), enabled: editingId !== null });
+  const existing = editingId === null ? undefined : (all.data ?? []).find((t) => t.id === editingId);
 
   const [type, setType] = useState<1 | 2>(2);
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState<number | null>(null);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(todayIso());
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [newAccount, setNewAccount] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Precarga única cuando llega el movimiento a editar.
+  if (existing && !loaded) {
+    setType(existing.type === 1 ? 1 : 2);
+    setAmount(String(existing.amount));
+    setAccountId(existing.accountId);
+    setCategoryId(existing.categoryId ?? null);
+    setNote(existing.note ?? '');
+    setDate(existing.date.slice(0, 10));
+    setLoaded(true);
+  }
 
   // La primera cuenta queda elegida: así registrar un gasto son dos toques
   // además de escribir el monto.
@@ -42,19 +62,20 @@ export default function CaptureScreen() {
   );
 
   const save = useMutation({
-    mutationFn: () =>
-      createTx(
-        {
-          accountId: selectedAccount as number,
-          categoryId,
-          type,
-          amount,
-          date: todayIso(),
-          note: note.trim(),
-        },
-        // Misma clave si el usuario toca Guardar dos veces: el backend no duplica.
-        { idempotencyKey: Crypto.randomUUID() },
-      ),
+    mutationFn: () => {
+      const body = {
+        accountId: selectedAccount as number,
+        categoryId,
+        type,
+        amount,
+        date,
+        note: note.trim(),
+      };
+      // Misma clave si el usuario toca Guardar dos veces: el backend no duplica.
+      return editingId === null
+        ? createTx(body, { idempotencyKey: Crypto.randomUUID() })
+        : updateTx(editingId, body);
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
       void qc.invalidateQueries({ queryKey: ['tx'] });
@@ -99,6 +120,7 @@ export default function CaptureScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: c.bg }}
     >
+      <Stack.Screen options={{ title: editingId === null ? 'Nuevo movimiento' : 'Editar movimiento' }} />
       <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
         <View style={s.toggle}>
           {([2, 1] as const).map((t) => {

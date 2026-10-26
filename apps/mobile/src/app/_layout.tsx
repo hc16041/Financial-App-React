@@ -54,6 +54,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ title: "Libro mayor" }} />
           <Stack.Screen name="login" options={{ title: 'Acceso', headerShown: false }} />
           <Stack.Screen name="capture" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
+          <Stack.Screen name="movements" options={{ title: 'Movimientos' }} />
         </Stack>
       </QueryClientProvider>
     </ThemeProvider>

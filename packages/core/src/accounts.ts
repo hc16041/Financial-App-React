@@ -78,3 +78,18 @@ export const createTx = (t: PersonalTxForm, opts?: { idempotencyKey?: string }) 
     opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : undefined,
   );
 };
+
+export const updateTx = (id: number, t: PersonalTxForm) => {
+  const v = txSchema.parse(t);
+  return apiPut<PersonalTx>(`/api/accounts/transactions/${id}`, {
+    id,
+    accountId: v.accountId,
+    categoryId: v.categoryId ?? null,
+    type: v.type,
+    amount: Number(v.amount),
+    date: v.date,
+    note: v.note,
+  });
+};
+
+export const deleteTx = (id: number) => apiDel<void>(`/api/accounts/transactions/${id}`);
