@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
-import { setToken, getToken, sessionStore, useAuth } from '@financial/core';
+import { setToken, getToken, sessionStore, useAuth, listAccounts, listCategories } from '@financial/core';
 import { configureMobileApi } from '@/lib/api';
+import { saveCache } from '@/lib/cache';
 import { useTheme } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -28,6 +29,9 @@ const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
+// Sin red, la captura necesita al menos los catálogos: cuentas y categorías.
+// Se persisten solo esas consultas; el resto del cache vive en memoria.
+
 export default function RootLayout() {
   const { c, isDark } = useTheme();
   const pathname = usePathname();
@@ -38,6 +42,20 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  // Con sesión activa se precalientan los catálogos: sin ellos la captura no
+  // puede funcionar sin red. Además se guardan en disco para ese caso.
+  useEffect(() => {
+    if (!getToken()) return;
+    void qc.prefetchQuery({ queryKey: ['accounts'], queryFn: listAccounts }).then(() => {
+      const data = qc.getQueryData(['accounts']);
+      if (data) void saveCache('accounts', data);
+    });
+    void qc.prefetchQuery({ queryKey: ['categories'], queryFn: () => listCategories() }).then(() => {
+      const data = qc.getQueryData(['categories']);
+      if (data) void saveCache('categories', data);
+    });
   }, []);
 
   return (

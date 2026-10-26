@@ -3,19 +3,20 @@ import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   getDashboardSummary, listBudgets, listTx,
-  money, useAuth, type PersonalTx,
+  money, useAuth, type PersonalTx, type DashboardSummary,
 } from '@financial/core';
 import KpiCard from '@/components/KpiCard';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useCachedQuery } from '@/hooks/useCachedList';
 import { shortDate } from '@/lib/date';
 import { radius, space, useTheme } from '@/theme/tokens';
 
 export default function HomeScreen() {
   const { c } = useTheme();
   const token = useAuth((s) => s.token);
+  const queue = useOfflineQueue();
 
-  const summary = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: getDashboardSummary,
+  const summary = useCachedQuery<DashboardSummary>('dashboard', ['dashboard'], getDashboardSummary, {
     enabled: Boolean(token),
   });
   const budgets = useQuery({ queryKey: ['budgets'], queryFn: listBudgets, enabled: Boolean(token) });
@@ -34,8 +35,9 @@ export default function HomeScreen() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 5);
 
-  const loading = summary.isPending;
-  const failed = summary.isError;
+  const data = summary.value;
+  const loading = summary.isPending && !data;
+  const failed = summary.isError && !data;
   const refresh = () => {
     void summary.refetch();
     void budgets.refetch();
@@ -50,9 +52,27 @@ export default function HomeScreen() {
           <RefreshControl refreshing={summary.isFetching} onRefresh={refresh} tintColor={c.textMuted} />
         }
       >
+        {queue.pending > 0 && (
+          <View style={[s.banner, { backgroundColor: c.surfaceMuted, borderColor: c.border }]}>
+            <Text style={[s.bannerText, { color: c.ink }]}>
+              {queue.pending} sin enviar{queue.failed > 0 ? ` · ${queue.failed} con error` : ''}
+            </Text>
+            <Pressable
+              onPress={() => void queue.sync()}
+              disabled={queue.syncing}
+              accessibilityRole="button"
+              accessibilityLabel="Sincronizar pendientes"
+            >
+              <Text style={[s.link, { color: c.primary }]}>
+                {queue.syncing ? 'Enviando…' : 'Sincronizar'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {loading ? (
           <ActivityIndicator color={c.primary} style={{ marginTop: space[5] }} />
-        ) : failed ? (
+        ) : failed || !data ? (
           <>
             <Text style={[s.error, { color: c.danger }]}>No se pudo cargar el resumen.</Text>
             <Pressable
@@ -68,11 +88,11 @@ export default function HomeScreen() {
           <>
             <Text style={[s.section, { color: c.textMuted }]}>SALDOS</Text>
             <View style={s.grid}>
-              <KpiCard label="Ahorros" value={summary.data.savings} tone="in" />
-              <KpiCard label="Deuda tarjetas" value={summary.data.cardDebt} tone="out" />
+              <KpiCard label="Ahorros" value={data.savings} tone="in" />
+              <KpiCard label="Deuda tarjetas" value={data.cardDebt} tone="out" />
             </View>
             <View style={s.grid}>
-              <KpiCard label="Deuda préstamos" value={summary.data.loanDebt} tone="out" />
+              <KpiCard label="Deuda préstamos" value={data.loanDebt} tone="out" />
               <KpiCard
                 label="Presupuesto del mes"
                 value={budgetSpent}
@@ -83,7 +103,7 @@ export default function HomeScreen() {
 
             <View style={[s.balance, { backgroundColor: c.surface, borderColor: c.border, borderTopColor: c.accent }]}>
               <Text style={[s.balanceLabel, { color: c.textMuted }]}>BALANCE TOTAL</Text>
-              <Text style={[s.balanceValue, { color: c.ink }]}>{money(summary.data.totalBalance)}</Text>
+              <Text style={[s.balanceValue, { color: c.ink }]}>{money(data.totalBalance)}</Text>
               <Text style={[s.balanceHint, { color: c.textMuted }]}>
                 ahorros + inversiones − deudas
               </Text>
@@ -161,6 +181,12 @@ const s = StyleSheet.create({
   section: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginTop: space[3] },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space[3] },
   link: { fontSize: 13, fontWeight: '600' },
+  banner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space[3], paddingVertical: space[2],
+    marginBottom: space[2],
+  },
+  bannerText: { fontSize: 13, fontWeight: '500' },
   grid: { flexDirection: 'row', gap: space[2] },
   balance: { borderWidth: 1, borderTopWidth: 3, borderRadius: radius.lg, padding: space[4], marginTop: space[2] },
   balanceLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },

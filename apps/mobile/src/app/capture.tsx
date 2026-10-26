@@ -7,9 +7,11 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import {
-  createAccount, createTx, updateTx, listAccounts, listCategories, listTx,
-  money, type Account, type Category,
+  ApiError, createAccount, createTx, updateTx, listAccounts, listCategories, listTx,
+  money, personalTxBody, type Account, type Category,
 } from '@financial/core';
+import { enqueue } from '@/lib/queue';
+import { useCachedList } from '@/hooks/useCachedList';
 import { todayIso } from '@/lib/date';
 import { radius, space, useTheme } from '@/theme/tokens';
 
@@ -23,8 +25,8 @@ export default function CaptureScreen() {
 
   const [loaded, setLoaded] = useState(false);
 
-  const accounts = useQuery({ queryKey: ['accounts'], queryFn: listAccounts });
-  const categories = useQuery({ queryKey: ['categories'], queryFn: () => listCategories() });
+  const accounts = useCachedList<Account>('accounts', ['accounts'], listAccounts);
+  const categories = useCachedList<Category>('categories', ['categories'], () => listCategories());
 
   // En modo edición se carga el movimiento existente desde la lista ya cacheada.
   const all = useQuery({ queryKey: ['tx', 'all'], queryFn: () => listTx({}), enabled: editingId !== null });
@@ -40,6 +42,7 @@ export default function CaptureScreen() {
   const [saved, setSaved] = useState(false);
   const [newAccount, setNewAccount] = useState('');
   const [creating, setCreating] = useState(false);
+  const [queued, setQueued] = useState(false);
 
   // Precarga única cuando llega el movimiento a editar.
   if (existing && !loaded) {
@@ -54,16 +57,16 @@ export default function CaptureScreen() {
 
   // La primera cuenta queda elegida: así registrar un gasto son dos toques
   // además de escribir el monto.
-  const selectedAccount = accountId ?? accounts.data?.[0]?.id ?? null;
+  const selectedAccount = accountId ?? accounts.items[0]?.id ?? null;
 
   const visibleCategories = useMemo(
-    () => (categories.data ?? []).filter((k: Category) => k.isActive && k.type === type),
-    [categories.data, type],
+    () => categories.items.filter((k: Category) => k.isActive && k.type === type),
+    [categories.items, type],
   );
 
   const save = useMutation({
-    mutationFn: () => {
-      const body = {
+    mutationFn: async () => {
+      const form = {
         accountId: selectedAccount as number,
         categoryId,
         type,
@@ -71,17 +74,32 @@ export default function CaptureScreen() {
         date,
         note: note.trim(),
       };
-      // Misma clave si el usuario toca Guardar dos veces: el backend no duplica.
-      return editingId === null
-        ? createTx(body, { idempotencyKey: Crypto.randomUUID() })
-        : updateTx(editingId, body);
+
+      if (editingId !== null) return updateTx(editingId, form);
+
+      const key = Crypto.randomUUID();
+      try {
+        return await createTx(form, { idempotencyKey: key });
+      } catch (e) {
+        // Sin red: se guarda en la cola y se envía cuando vuelva la conexión.
+        if (e instanceof ApiError) throw e;
+        await enqueue({
+          key,
+          method: 'POST',
+          path: '/api/accounts/transactions',
+          body: personalTxBody(form),
+          label: note.trim() || (type === 2 ? 'Gasto' : 'Ingreso'),
+        });
+        return 'queued' as const;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
       void qc.invalidateQueries({ queryKey: ['tx'] });
       void qc.invalidateQueries({ queryKey: ['accounts'] });
       setSaved(true);
-      setTimeout(() => router.back(), 700);
+      setQueued(result === 'queued');
+      setTimeout(() => router.back(), result === 'queued' ? 1200 : 700);
     },
     onError: (e) => setError((e as Error)?.message ?? 'No se pudo guardar'),
   });
@@ -96,7 +114,8 @@ export default function CaptureScreen() {
   const disabled = save.isPending || !amount.trim() || !selectedAccount;
 
   const accountsReady = !accounts.isPending;
-  const noAccounts = accountsReady && (accounts.data ?? []).length === 0;
+  const noAccounts = accountsReady && !accounts.isError && accounts.items.length === 0;
+  const accountsUnavailable = accounts.isError && accounts.items.length === 0;
 
   const addAccount = async (type: 1 | 2) => {
     const name = newAccount.trim();
@@ -160,7 +179,11 @@ export default function CaptureScreen() {
         />
 
         <Text style={[s.label, { color: c.textMuted }]}>CUENTA</Text>
-        {noAccounts ? (
+        {accountsUnavailable ? (
+          <Text style={[s.hint, { color: c.danger }]}>
+            Sin conexión y sin cuentas guardadas. Conéctate una vez para poder registrar sin red.
+          </Text>
+        ) : noAccounts ? (
           <View style={[s.newAccount, { borderColor: c.borderStrong, backgroundColor: c.surface }]}>
             <Text style={[s.hint, { color: c.textMuted }]}>
               Necesitas una cuenta para registrar movimientos. Crea la primera:
@@ -198,7 +221,7 @@ export default function CaptureScreen() {
           </View>
         ) : (
           <View style={s.chips}>
-            {(accounts.data ?? []).map((a) => {
+            {accounts.items.map((a) => {
               const active = a.id === selectedAccount;
               return (
                 <Pressable
@@ -254,7 +277,13 @@ export default function CaptureScreen() {
         />
 
         {error && <Text style={[s.error, { color: c.danger }]}>{error}</Text>}
-        {saved && <Text style={[s.ok, { color: c.success }]}>Movimiento registrado.</Text>}
+        {saved && (
+          <Text style={[s.ok, { color: queued ? c.accent : c.success }]}>
+            {queued
+              ? 'Guardado sin conexión. Se enviará cuando vuelvas a tener red.'
+              : editingId === null ? 'Movimiento registrado.' : 'Cambios guardados.'}
+          </Text>
+        )}
 
         <Pressable
           onPress={submit}
