@@ -111,12 +111,32 @@ describe('movimientos de cuenta', () => {
     expect(last().url).toContain('/api/accounts/transactions');
     expect(body()).toEqual({
       accountId: 1,
+      creditCardId: null,
       categoryId: null,
       type: 2,
       amount: 25.5,
       date: '2026-10-02',
       note: '',
     });
+  });
+
+  it('con tarjeta manda la tarjeta y no la cuenta', async () => {
+    stub({ id: 2 });
+    await createTx(form({ accountId: null, creditCardId: 3 }));
+    expect(body()).toEqual({
+      accountId: null,
+      creditCardId: 3,
+      categoryId: 2,
+      type: 2,
+      amount: 25.5,
+      date: '2026-10-02',
+      note: 'cafe',
+    });
+  });
+
+  it('rechaza un movimiento sin origen o con los dos', () => {
+    expect(() => createTx(form({ accountId: null, creditCardId: null }))).toThrow();
+    expect(() => createTx(form({ accountId: 1, creditCardId: 3 }))).toThrow();
   });
 
   it('exige cuenta, monto y fecha', async () => {

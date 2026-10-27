@@ -3,7 +3,7 @@ import { View, AppState } from 'react-native';
 import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
-import { setToken, getToken, sessionStore, useAuth, listAccounts, listCategories } from '@financial/core';
+import { setToken, getToken, sessionStore, useAuth, listAccounts, listCards, listCategories } from '@financial/core';
 import { configureMobileApi } from '@/lib/api';
 import { saveCache } from '@/lib/cache';
 import { useLock } from '@/lib/lock';
@@ -74,6 +74,10 @@ export default function RootLayout() {
     void qc.prefetchQuery({ queryKey: ['categories'], queryFn: () => listCategories() }).then(() => {
       const data = qc.getQueryData(['categories']);
       if (data) void saveCache('categories', data);
+    });
+    void qc.prefetchQuery({ queryKey: ['cards'], queryFn: listCards }).then(() => {
+      const data = qc.getQueryData(['cards']);
+      if (data) void saveCache('cards', data);
     });
   }, [token]);
 

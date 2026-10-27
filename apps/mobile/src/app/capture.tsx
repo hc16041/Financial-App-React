@@ -7,8 +7,8 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import {
-  ApiError, createAccount, createTx, updateTx, listAccounts, listCategories, listTx,
-  money, personalTxBody, type Account, type Category,
+  ApiError, createAccount, createTx, updateTx, listAccounts, listCards, listCategories, listTx,
+  money, personalTxBody, type Account, type Card, type Category,
 } from '@financial/core';
 import { enqueue } from '@/lib/queue';
 import { useCachedList } from '@/hooks/useCachedList';
@@ -26,6 +26,7 @@ export default function CaptureScreen() {
   const [loaded, setLoaded] = useState(false);
 
   const accounts = useCachedList<Account>('accounts', ['accounts'], listAccounts);
+  const cards = useCachedList<Card>('cards', ['cards'], listCards);
   const categories = useCachedList<Category>('categories', ['categories'], () => listCategories());
 
   // En modo edición se carga el movimiento existente desde la lista ya cacheada.
@@ -35,6 +36,7 @@ export default function CaptureScreen() {
   const [type, setType] = useState<1 | 2>(2);
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState<number | null>(null);
+  const [creditCardId, setCreditCardId] = useState<number | null>(null);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [date, setDate] = useState(todayIso());
@@ -48,7 +50,8 @@ export default function CaptureScreen() {
   if (existing && !loaded) {
     setType(existing.type === 1 ? 1 : 2);
     setAmount(String(existing.amount));
-    setAccountId(existing.accountId);
+    setAccountId(existing.accountId ?? null);
+    setCreditCardId(existing.creditCardId ?? null);
     setCategoryId(existing.categoryId ?? null);
     setNote(existing.note ?? '');
     setDate(existing.date.slice(0, 10));
@@ -57,7 +60,8 @@ export default function CaptureScreen() {
 
   // La primera cuenta queda elegida: así registrar un gasto son dos toques
   // además de escribir el monto.
-  const selectedAccount = accountId ?? accounts.items[0]?.id ?? null;
+  const selectedAccount = accountId ?? (creditCardId === null ? accounts.items[0]?.id ?? null : null);
+  const selectedCard = creditCardId ?? (accountId === null && accounts.items.length === 0 ? cards.items[0]?.id ?? null : null);
 
   const visibleCategories = useMemo(
     () => categories.items.filter((k: Category) => k.isActive && k.type === type),
@@ -67,7 +71,8 @@ export default function CaptureScreen() {
   const save = useMutation({
     mutationFn: async () => {
       const form = {
-        accountId: selectedAccount as number,
+        accountId: selectedAccount,
+        creditCardId: selectedCard,
         categoryId,
         type,
         amount,
@@ -107,13 +112,15 @@ export default function CaptureScreen() {
   const submit = () => {
     setError(null);
     if (!MONEY.test(amount.trim())) return setError('Monto inválido: usa hasta 2 decimales.');
-    if (!selectedAccount) return setError('Necesitas al menos una cuenta.');
+    if (!selectedAccount && !selectedCard) {
+      return setError('Necesitas una cuenta o una tarjeta como origen.');
+    }
     save.mutate();
   };
 
-  const disabled = save.isPending || !amount.trim() || !selectedAccount;
+  const disabled = save.isPending || !amount.trim() || (!selectedAccount && !selectedCard);
 
-  const hasAccounts = accounts.items.length > 0;
+  const hasAccounts = accounts.items.length > 0 || cards.items.length > 0;
   const noAccounts = !hasAccounts && !accounts.isError && !accounts.isPending;
   const accountsUnavailable = !hasAccounts && (accounts.isError || accounts.isPending);
 
@@ -178,15 +185,15 @@ export default function CaptureScreen() {
           style={[s.amountInput, { color: c.ink, borderColor: c.borderStrong, backgroundColor: c.surface }]}
         />
 
-        <Text style={[s.label, { color: c.textMuted }]}>CUENTA</Text>
+        <Text style={[s.label, { color: c.textMuted }]}>ORIGEN</Text>
         {accountsUnavailable ? (
           <Text style={[s.hint, { color: c.danger }]}>
-            Sin conexión y sin cuentas guardadas. Conéctate una vez para poder registrar sin red.
+            Sin conexión y sin orígenes guardados. Conéctate una vez para poder registrar sin red.
           </Text>
         ) : noAccounts ? (
           <View style={[s.newAccount, { borderColor: c.borderStrong, backgroundColor: c.surface }]}>
             <Text style={[s.hint, { color: c.textMuted }]}>
-              Necesitas una cuenta para registrar movimientos. Crea la primera:
+              Necesitas una cuenta o una tarjeta para registrar movimientos. Crea la primera:
             </Text>
             <TextInput
               value={newAccount}
@@ -225,8 +232,8 @@ export default function CaptureScreen() {
               const active = a.id === selectedAccount;
               return (
                 <Pressable
-                  key={a.id}
-                  onPress={() => setAccountId(a.id)}
+                  key={`acc-${a.id}`}
+                  onPress={() => { setAccountId(a.id); setCreditCardId(null); }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={a.name}
@@ -234,6 +241,23 @@ export default function CaptureScreen() {
                 >
                   <Text style={{ color: active ? '#fff' : c.ink, fontSize: 14 }}>
                     {a.name} · {money(a.balance)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {cards.items.map((card) => {
+              const active = card.id === selectedCard;
+              return (
+                <Pressable
+                  key={`card-${card.id}`}
+                  onPress={() => { setCreditCardId(card.id); setAccountId(null); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={String(card.name ?? card.bankName ?? 'Tarjeta')}
+                  style={[s.chip, { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.accent : c.surface }]}
+                >
+                  <Text style={{ color: active ? '#fff' : c.ink, fontSize: 14 }}>
+                    {String(card.name ?? card.bankName ?? 'Tarjeta')}
                   </Text>
                 </Pressable>
               );
