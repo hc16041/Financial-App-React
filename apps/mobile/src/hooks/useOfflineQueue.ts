@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { flush, listPending, type PendingWrite } from '@/lib/queue';
+import { flush, listPending, removePending, type PendingWrite } from '@/lib/queue';
 
 // Mantiene el estado de la cola y la vacía al volver a la app, que es cuando
 // más probable es que haya red otra vez.
@@ -55,5 +55,9 @@ export const useOfflineQueue = () => {
     syncing,
     sync,
     reload,
+    discard: async (key: string) => {
+      await removePending(key);
+      await reload();
+    },
   };
 };

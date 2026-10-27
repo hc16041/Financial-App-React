@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
+import { View, AppState } from 'react-native';
 import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { setToken, getToken, sessionStore, useAuth, listAccounts, listCategories } from '@financial/core';
 import { configureMobileApi } from '@/lib/api';
 import { saveCache } from '@/lib/cache';
+import { useLock } from '@/lib/lock';
+import UnlockScreen from '@/components/UnlockScreen';
 import { useTheme } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -36,6 +39,19 @@ export default function RootLayout() {
   const { c, isDark } = useTheme();
   const pathname = usePathname();
   const token = useAuth((s) => s.token);
+  const { enabled: lockEnabled, locked, hydrated: lockHydrated, hydrate } = useLock();
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  // Volver de segundo plano exige desbloquear de nuevo.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') useLock.getState().lock();
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     currentPath = pathname;
@@ -61,6 +77,19 @@ export default function RootLayout() {
     });
   }, [token]);
 
+  // Mientras se hidrata la preferencia no se muestra nada: si no, se vería
+  // un parpadeo de los datos antes de bloquear.
+  if (!lockHydrated) return <View style={{ flex: 1, backgroundColor: c.bg }} />;
+
+  // Con sesión y bloqueo activo, la app no muestra contenido hasta autenticarse.
+  if (lockEnabled && locked && token) {
+    return (
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <UnlockScreen />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <QueryClientProvider client={qc}>
@@ -76,6 +105,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ title: 'Acceso', headerShown: false }} />
           <Stack.Screen name="capture" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
           <Stack.Screen name="movements" options={{ title: 'Movimientos' }} />
+          <Stack.Screen name="pending" options={{ title: 'Envíos pendientes' }} />
         </Stack>
       </QueryClientProvider>
     </ThemeProvider>

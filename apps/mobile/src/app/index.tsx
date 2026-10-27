@@ -1,13 +1,17 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import {
-  getDashboardSummary, listBudgets, listTx,
+  getDashboardSummary, listBudgets, listTx, listLoans, listCards,
   money, useAuth, type PersonalTx, type DashboardSummary,
 } from '@financial/core';
 import KpiCard from '@/components/KpiCard';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useCachedQuery } from '@/hooks/useCachedList';
+import { authenticate, biometricsAvailable } from '@/lib/biometrics';
+import { useLock } from '@/lib/lock';
+import { rescheduleReminders } from '@/lib/notifications';
 import { shortDate } from '@/lib/date';
 import { radius, space, useTheme } from '@/theme/tokens';
 
@@ -15,12 +19,25 @@ export default function HomeScreen() {
   const { c } = useTheme();
   const token = useAuth((s) => s.token);
   const queue = useOfflineQueue();
+  const lockEnabled = useLock((s) => s.enabled);
+  const enableLock = useLock((s) => s.enable);
+  const disableLock = useLock((s) => s.disable);
 
   const summary = useCachedQuery<DashboardSummary>('dashboard', ['dashboard'], getDashboardSummary, {
     enabled: Boolean(token),
   });
   const budgets = useQuery({ queryKey: ['budgets'], queryFn: listBudgets, enabled: Boolean(token) });
   const tx = useQuery({ queryKey: ['tx', 'recent'], queryFn: () => listTx({}), enabled: Boolean(token) });
+
+  // Recordatorios locales de cuota y vencimiento. Se recalculan al abrir la app,
+  // así reflejan el estado más reciente sin depender de un servidor de push.
+  const loans = useQuery({ queryKey: ['loans', 'reminders'], queryFn: listLoans, enabled: Boolean(token) });
+  const cards = useQuery({ queryKey: ['cards', 'reminders'], queryFn: listCards, enabled: Boolean(token) });
+
+  useEffect(() => {
+    if (!loans.data || !cards.data) return;
+    void rescheduleReminders(loans.data, cards.data).catch(() => {});
+  }, [loans.data, cards.data]);
 
   if (!token) return <Redirect href="/login" />;
 
@@ -52,22 +69,20 @@ export default function HomeScreen() {
           <RefreshControl refreshing={summary.isFetching} onRefresh={refresh} tintColor={c.textMuted} />
         }
       >
-        {queue.pending > 0 && (
-          <View style={[s.banner, { backgroundColor: c.surfaceMuted, borderColor: c.border }]}>
+        {queue.pending + queue.failed > 0 && (
+          <Pressable
+            onPress={() => router.push('/pending')}
+            accessibilityRole="button"
+            accessibilityLabel="Ver envíos pendientes"
+            style={[s.banner, { backgroundColor: c.surfaceMuted, borderColor: c.border }]}
+          >
             <Text style={[s.bannerText, { color: c.ink }]}>
               {queue.pending} sin enviar{queue.failed > 0 ? ` · ${queue.failed} con error` : ''}
             </Text>
-            <Pressable
-              onPress={() => void queue.sync()}
-              disabled={queue.syncing}
-              accessibilityRole="button"
-              accessibilityLabel="Sincronizar pendientes"
-            >
-              <Text style={[s.link, { color: c.primary }]}>
-                {queue.syncing ? 'Enviando…' : 'Sincronizar'}
-              </Text>
-            </Pressable>
-          </View>
+            <Text style={[s.link, { color: c.primary }]}>
+              {queue.syncing ? 'Enviando…' : 'Ver'}
+            </Text>
+          </Pressable>
         )}
 
         {loading ? (
@@ -154,6 +169,31 @@ export default function HomeScreen() {
           </>
         )}
 
+        <View style={[s.setting, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.settingTitle, { color: c.ink }]}>Bloqueo biométrico</Text>
+            <Text style={[s.settingHint, { color: c.textMuted }]}>
+              Pide huella o rostro al abrir la app
+            </Text>
+          </View>
+          <Switch
+            value={lockEnabled}
+            accessibilityLabel="Bloqueo biométrico"
+            onValueChange={(next) => {
+              void (async () => {
+                if (!next) return disableLock();
+                if (!(await biometricsAvailable())) {
+                  Alert.alert('Sin biometría', 'Configura huella o rostro en el teléfono primero.');
+                  return;
+                }
+                if (await authenticate('Confirma tu identidad para activar el bloqueo')) {
+                  await enableLock();
+                }
+              })();
+            }}
+          />
+        </View>
+
         <Pressable
           onPress={() => useAuth.getState().logout()}
           accessibilityRole="button"
@@ -187,6 +227,12 @@ const s = StyleSheet.create({
     marginBottom: space[2],
   },
   bannerText: { fontSize: 13, fontWeight: '500' },
+  setting: {
+    flexDirection: 'row', alignItems: 'center', gap: space[3],
+    borderWidth: 1, borderRadius: radius.lg, padding: space[3], marginTop: space[3],
+  },
+  settingTitle: { fontSize: 15, fontWeight: '500' },
+  settingHint: { fontSize: 12, marginTop: 1 },
   grid: { flexDirection: 'row', gap: space[2] },
   balance: { borderWidth: 1, borderTopWidth: 3, borderRadius: radius.lg, padding: space[4], marginTop: space[2] },
   balanceLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
