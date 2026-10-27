@@ -113,9 +113,9 @@ export default function CaptureScreen() {
 
   const disabled = save.isPending || !amount.trim() || !selectedAccount;
 
-  const accountsReady = !accounts.isPending;
-  const noAccounts = accountsReady && !accounts.isError && accounts.items.length === 0;
-  const accountsUnavailable = accounts.isError && accounts.items.length === 0;
+  const hasAccounts = accounts.items.length > 0;
+  const noAccounts = !hasAccounts && !accounts.isError && !accounts.isPending;
+  const accountsUnavailable = !hasAccounts && (accounts.isError || accounts.isPending);
 
   const addAccount = async (type: 1 | 2) => {
     const name = newAccount.trim();

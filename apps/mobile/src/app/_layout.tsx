@@ -35,6 +35,7 @@ const qc = new QueryClient({
 export default function RootLayout() {
   const { c, isDark } = useTheme();
   const pathname = usePathname();
+  const token = useAuth((s) => s.token);
 
   useEffect(() => {
     currentPath = pathname;
@@ -46,8 +47,10 @@ export default function RootLayout() {
 
   // Con sesión activa se precalientan los catálogos: sin ellos la captura no
   // puede funcionar sin red. Además se guardan en disco para ese caso.
+  // Depende del token: al loguearse la pantalla no se remonta, así que sin esta
+  // dependencia el prefetch nunca corría hasta reiniciar la app.
   useEffect(() => {
-    if (!getToken()) return;
+    if (!token) return;
     void qc.prefetchQuery({ queryKey: ['accounts'], queryFn: listAccounts }).then(() => {
       const data = qc.getQueryData(['accounts']);
       if (data) void saveCache('accounts', data);
@@ -56,7 +59,7 @@ export default function RootLayout() {
       const data = qc.getQueryData(['categories']);
       if (data) void saveCache('categories', data);
     });
-  }, []);
+  }, [token]);
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
