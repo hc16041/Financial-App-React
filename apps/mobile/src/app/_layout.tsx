@@ -110,6 +110,8 @@ export default function RootLayout() {
           <Stack.Screen name="capture" options={{ title: 'Nuevo movimiento', presentation: 'modal' }} />
           <Stack.Screen name="movements" options={{ title: 'Movimientos' }} />
           <Stack.Screen name="pending" options={{ title: 'Envíos pendientes' }} />
+          <Stack.Screen name="maintenance/index" options={{ title: 'Mantenimientos' }} />
+          <Stack.Screen name="maintenance/[slug]" options={{ title: '' }} />
         </Stack>
       </QueryClientProvider>
     </ThemeProvider>

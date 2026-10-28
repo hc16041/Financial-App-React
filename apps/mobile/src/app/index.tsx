@@ -169,6 +169,21 @@ export default function HomeScreen() {
           </>
         )}
 
+        <Pressable
+          onPress={() => router.push('/maintenance')}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir mantenimientos"
+          style={[s.setting, { backgroundColor: c.surface, borderColor: c.border, marginTop: space[3] }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[s.settingTitle, { color: c.ink }]}>Mantenimientos</Text>
+            <Text style={[s.settingHint, { color: c.textMuted }]}>
+              Categorías, comercios, cuentas, tarjetas, presupuestos, metas e inversiones
+            </Text>
+          </View>
+          <Text style={{ color: c.textMuted, fontSize: 18 }}>›</Text>
+        </Pressable>
+
         <View style={[s.setting, { backgroundColor: c.surface, borderColor: c.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[s.settingTitle, { color: c.ink }]}>Bloqueo biométrico</Text>
