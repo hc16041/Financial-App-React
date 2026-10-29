@@ -13,6 +13,7 @@ export const recurringSchema = z.object({
   name: z.string().min(3, 'err.min3'),
   amount: moneyString,
   frequency: z.enum(['Semanal', 'Mensual', 'Anual']),
+  type: z.union([z.literal(1), z.literal(2)]).default(2),
   active: z.boolean().optional(),
 });
 export type RecurringForm = z.input<typeof recurringSchema>;
@@ -35,6 +36,8 @@ export type Recurring = {
   frequencyName: string;
   active: boolean;
   nextDue: string;
+  type?: number;
+  typeName?: string;
 };
 
 // El API usa 1/2/3; el formulario conserva las etiquetas en español.
@@ -68,6 +71,7 @@ export const createRecurring = (r: RecurringForm) => {
     name: v.name,
     amount: Number(v.amount),
     frequency: FREQ[v.frequency],
+    type: v.type,
   });
 };
 export const toggleRecurring = (id: number) => apiPut<Recurring>(`/api/goals/recurring/${id}/toggle`, {});

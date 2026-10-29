@@ -192,7 +192,14 @@ export default function GoalsPage() {
             <input id="rec-amount" {...fR.register('amount')} inputMode="decimal" />
           </div>
           <div className="field">
-            <label htmlFor="rec-freq">{t('common.type')}</label>
+            <label htmlFor="rec-type">{t('common.type')}</label>
+            <select id="rec-type" {...fR.register('type', { valueAsNumber: true })}>
+              <option value={1}>{t('categories.income')}</option>
+              <option value={2}>{t('categories.expense')}</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="rec-freq">{t('goals.frequency')}</label>
             <select id="rec-freq" {...fR.register('frequency')}><option>Semanal</option><option>Mensual</option><option>Anual</option></select>
           </div>
           {addR.isError && <p className="error-text">{(addR.error as Error)?.message}</p>}

@@ -192,11 +192,17 @@ describe('metas y recurrentes: dinero sale de una cuenta real', () => {
   it('crea recurrente mapeando la frecuencia a 1/2/3', async () => {
     stub({ id: 1 });
     await createRecurring({ name: 'Renta', amount: '300.00', frequency: 'Mensual' });
-    expect(body()).toEqual({ name: 'Renta', amount: 300, frequency: 2 });
+    expect(body()).toEqual({ name: 'Renta', amount: 300, frequency: 2, type: 2 });
     await createRecurring({ name: 'Streaming', amount: '5.00', frequency: 'Semanal' });
-    expect(body()).toEqual({ name: 'Streaming', amount: 5, frequency: 1 });
+    expect(body()).toEqual({ name: 'Streaming', amount: 5, frequency: 1, type: 2 });
     await createRecurring({ name: 'Seguro', amount: '80.00', frequency: 'Anual' });
-    expect(body()).toEqual({ name: 'Seguro', amount: 80, frequency: 3 });
+    expect(body()).toEqual({ name: 'Seguro', amount: 80, frequency: 3, type: 2 });
+  });
+
+  it('un recurrente de ingreso viaja con type 1', async () => {
+    stub({ id: 1 });
+    await createRecurring({ name: 'Sueldo', amount: '1430.65', frequency: 'Mensual', type: 1 });
+    expect(body()).toEqual({ name: 'Sueldo', amount: 1430.65, frequency: 2, type: 1 });
   });
 
   it('crea y edita metas con fecha opcional', async () => {
