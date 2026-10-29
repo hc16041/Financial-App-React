@@ -37,7 +37,7 @@ export default function TransactionsPage() {
           <option value="all">{t('tx.all')}</option>
           <option value="cash">{t('tx.cash')}</option>
           {(Array.isArray(cards.data) ? cards.data : []).map((c) => (
-            <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>
+            <option key={c.id} value={c.id}>{String(c.bankName ?? c.name ?? `#${c.id}`)}</option>
           ))}
         </select>
         <input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} aria-label={t('common.from')} title={t('common.from')} />

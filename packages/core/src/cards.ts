@@ -3,8 +3,25 @@ import { z } from 'zod';
 
 // Lectura real :5063 (CRUD de tarjetas ya existe en Angular legacy; aquí paridad de lectura).
 export type CardSummary = { totalCreditLimit: number; totalCurrentBalance: number; totalAvailableCredit: number };
-export type Card = { id: number; name?: string; bankName?: string; creditLimit?: number; currentBalance?: number; [k: string]: unknown };
-export type CardConsumption = { cardId?: number; cardName?: string; total?: number; [k: string]: unknown };
+export type Card = {
+  id: number; name?: string; bankName?: string;
+  creditLimit?: number; currentBalance?: number; availableCredit?: number;
+  cutOffDay?: number; paymentDueDay?: number; annualInterestRate?: number;
+  isActive?: boolean;
+  [k: string]: unknown;
+};
+export type CardConsumption = {
+  creditCardId: number;
+  bankName: string;
+  creditLimit?: number;
+  currentBalance?: number;
+  availableCredit?: number;
+  totalExpenses?: number;
+  totalPayments?: number;
+  transactionCount?: number;
+  utilizationPercentage?: number;
+  [k: string]: unknown;
+};
 
 export const listCards = () => apiGet<Card[]>(`/api/CreditCards`);
 export const cardSchema = z.object({

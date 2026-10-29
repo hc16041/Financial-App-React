@@ -86,13 +86,22 @@ export default function CardsPage() {
 
       {items.length === 0 ? <p className="empty-state">{t('common.empty')}</p> : (
         <div className="table-wrap"><table className="ledger">
-          <thead><tr><th>{t('common.name')}</th><th>{t('cards.limit')}</th><th>{t('cards.balance')}</th></tr></thead>
+          <thead>
+            <tr>
+              <th>{t('cards.bank')}</th><th>{t('cards.limit')}</th><th>{t('cards.balance')}</th>
+              <th>{t('cards.available')}</th><th>{t('cards.cutOff')}</th><th>{t('cards.dueDay')}</th><th>{t('cards.rate')}</th>
+            </tr>
+          </thead>
           <tbody>
             {items.map((c) => (
               <tr key={c.id} data-sign="out">
-                <td>{c.name ?? `#${c.id}`}</td>
+                <td>{c.bankName ?? c.name ?? `#${c.id}`}</td>
                 <td className="ledger-figure">{cell(c.creditLimit ?? c.limit)}</td>
                 <td className="ledger-figure">{cell(c.currentBalance ?? c.balance)}</td>
+                <td className="ledger-figure">{cell(c.availableCredit)}</td>
+                <td>{c.cutOffDay ?? '—'}</td>
+                <td>{c.paymentDueDay ?? '—'}</td>
+                <td className="ledger-figure">{c.annualInterestRate ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -103,8 +112,8 @@ export default function CardsPage() {
       {cons.isPending ? <Skeleton rows={3} /> : consItems.length === 0 ? <p className="empty-state">{t('common.empty')}</p> : (
         <div className="card">
           <NameValueBars
-            names={consItems.map((r, i) => String(r.cardName ?? r.name ?? r.cardId ?? `#${i}`))}
-            values={consItems.map((r) => Number(r.total ?? r.amount ?? 0))}
+            names={consItems.map((r) => String(r.bankName ?? `#${r.creditCardId}`))}
+            values={consItems.map((r) => Number(r.totalExpenses ?? 0))}
             color="var(--fp-danger)"
             ariaLabel={t('cards.chartAria')}
           />
