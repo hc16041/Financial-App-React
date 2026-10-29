@@ -16,6 +16,7 @@ import {
   createRecurring,
   toggleRecurring,
   payRecurring,
+  investmentSchema,
   type PersonalTxForm,
 } from '@financial/core';
 
@@ -225,5 +226,27 @@ describe('schemas de formulario emiten codigos i18n (err.*)', () => {
       );
       expect(t.error.issues.every((i) => typeof i.message === 'string')).toBe(true);
     }
+  });
+});
+
+// Un <select> sin opción elegida emite "", no undefined. El schema de inversión
+// pide number | null: por eso el formulario coerciona antes de validar. Sin esa
+// coerción el submit se quedaba enfocando el primer select vacío.
+describe('inversiones: select vacío contra el schema', () => {
+  const base = {
+    platformId: 1,
+    amount: '100.00',
+    commission: '0',
+    transactionType: 2 as const,
+    transactionDate: '2026-10-28',
+  };
+
+  it('rechaza el "" crudo del select', () => {
+    expect(investmentSchema.safeParse({ ...base, withdrawalMethodId: '', creditCardId: '' }).success).toBe(false);
+  });
+
+  it('acepta null, que es lo que el formulario envía al no elegir', () => {
+    const result = investmentSchema.safeParse({ ...base, withdrawalMethodId: null, creditCardId: null });
+    expect(result.success).toBe(true);
   });
 });

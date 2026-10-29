@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 // Lectura real :5063 (CRUD de tarjetas ya existe en Angular legacy; aquí paridad de lectura).
 export type CardSummary = { totalCreditLimit: number; totalCurrentBalance: number; totalAvailableCredit: number };
-export type Card = { id: number; name?: string; creditLimit?: number; currentBalance?: number; [k: string]: unknown };
+export type Card = { id: number; name?: string; bankName?: string; creditLimit?: number; currentBalance?: number; [k: string]: unknown };
 export type CardConsumption = { cardId?: number; cardName?: string; total?: number; [k: string]: unknown };
 
 export const listCards = () => apiGet<Card[]>(`/api/CreditCards`);

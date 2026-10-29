@@ -8,6 +8,8 @@ export type Investment = {
   id: number; platformId: number; platformName?: string;
   amount: number; commission: number; total: number;
   transactionType?: number; transactionDate?: string;
+  withdrawalMethodId?: number | null; withdrawalMethodName?: string;
+  creditCardId?: number | null;
   [k: string]: unknown;
 };
 
