@@ -11,7 +11,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.0.50:5063"
+        "EXPO_PUBLIC_API_URL": "https://api.ferthl.duckdns.org"
       }
     },
     "preview": {
@@ -20,11 +20,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.0.50:5063"
+        "EXPO_PUBLIC_API_URL": "https://api.ferthl.duckdns.org"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.ferthl.duckdns.org"
+      }
     }
   },
   "submit": {
