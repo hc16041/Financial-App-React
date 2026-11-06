@@ -5,7 +5,7 @@ import {
   listAccounts, createAccount, updateAccount, deleteAccount,
   listBudgets, createBudget, updateBudget, deleteBudget,
   listGoals, createGoal, updateGoal,
-  listCards, createCard,
+  listCards, createCard, updateCard, deleteCard,
   listInvestments, createInvestment, updateInvestment, deleteInvestment,
   money,
 } from '@financial/core';
@@ -200,7 +200,18 @@ export const MAINTENANCES: MaintenanceConfig[] = [
         cutOffDay: num(v.cutOffDay),
         paymentDueDay: num(v.paymentDueDay),
         annualInterestRate: moneyStr(v.annualInterestRate || '0'),
+        isActive: true,
       }),
+    update: (id, v) =>
+      updateCard(id, {
+        bankName: v.bankName,
+        creditLimit: moneyStr(v.creditLimit),
+        cutOffDay: num(v.cutOffDay),
+        paymentDueDay: num(v.paymentDueDay),
+        annualInterestRate: moneyStr(v.annualInterestRate || '0'),
+        isActive: true,
+      }),
+    remove: (id) => deleteCard(id),
     columns: [
       { key: 'bankName', label: 'Banco' },
       { key: 'creditLimit', label: 'Límite', money: true },

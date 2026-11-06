@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiGet, apiPost, apiPut } from './api-client';
+import { apiDel, apiGet, apiPost, apiPut } from './api-client';
 import { moneyString } from './schemas';
 
 export const goalSchema = z.object({
@@ -74,6 +74,19 @@ export const createRecurring = (r: RecurringForm) => {
     type: v.type,
   });
 };
+export const updateRecurring = (id: number, r: RecurringForm) => {
+  const v = recurringSchema.parse(r);
+  return apiPut<Recurring>(`/api/goals/recurring/${id}`, {
+    name: v.name,
+    amount: Number(v.amount),
+    frequency: FREQ[v.frequency],
+    type: v.type,
+  });
+};
+
+export const deleteRecurring = (id: number) =>
+  apiDel<{ deleted: boolean }>(`/api/goals/recurring/${id}`);
+
 export const toggleRecurring = (id: number) => apiPut<Recurring>(`/api/goals/recurring/${id}/toggle`, {});
 
 /// Marca pagado: el backend registra el gasto en la cuenta y avanza NextDue.

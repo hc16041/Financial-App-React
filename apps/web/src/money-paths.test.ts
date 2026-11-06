@@ -17,6 +17,7 @@ import {
   toggleRecurring,
   payRecurring,
   investmentSchema,
+  updateSavingTx, deleteSavingTx, updateCard, deleteCard, updateRecurring, deleteRecurring,
   type PersonalTxForm,
 } from '@financial/core';
 
@@ -254,5 +255,56 @@ describe('inversiones: select vacío contra el schema', () => {
   it('acepta null, que es lo que el formulario envía al no elegir', () => {
     const result = investmentSchema.safeParse({ ...base, withdrawalMethodId: null, creditCardId: null });
     expect(result.success).toBe(true);
+  });
+});
+
+// Corregir y borrar lo ya registrado: estas rutas tocan dinero ya asentado, así que
+// el contrato (verbo, ruta y forma del cuerpo) queda fijado acá.
+describe('correcciones: ahorros, tarjetas y recurrentes', () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  it('edita un movimiento de ahorro con el monto ya numérico', async () => {
+    stub({ id: 3 });
+    await updateSavingTx(3, { date: '2026-11-01', amount: '250.50', description: 'Corregido', transactionType: 1 });
+    expect(last().url).toContain('/api/savings/transactions/3');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ date: '2026-11-01', amount: 250.5, description: 'Corregido', transactionType: 1 });
+  });
+
+  it('borra un movimiento de ahorro', async () => {
+    stub();
+    await deleteSavingTx(3);
+    expect(last().url).toContain('/api/savings/transactions/3');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('edita una tarjeta enviando isActive', async () => {
+    stub({ id: 6 });
+    await updateCard(6, { bankName: 'BAC', creditLimit: '2000', cutOffDay: 15, paymentDueDay: 5, annualInterestRate: '0', isActive: false });
+    expect(last().url).toContain('/api/CreditCards/6');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ bankName: 'BAC', creditLimit: 2000, cutOffDay: 15, paymentDueDay: 5, annualInterestRate: 0, isActive: false });
+  });
+
+  it('borra una tarjeta', async () => {
+    stub();
+    await deleteCard(6);
+    expect(last().url).toContain('/api/CreditCards/6');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('edita un recurrente conservando su tipo', async () => {
+    stub({ id: 2 });
+    await updateRecurring(2, { name: 'Sueldo', amount: '1430.65', frequency: 'Mensual', type: 1 });
+    expect(last().url).toContain('/api/goals/recurring/2');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ name: 'Sueldo', amount: 1430.65, frequency: 2, type: 1 });
+  });
+
+  it('borra un recurrente', async () => {
+    stub();
+    await deleteRecurring(2);
+    expect(last().url).toContain('/api/goals/recurring/2');
+    expect(last().init?.method).toBe('DELETE');
   });
 });

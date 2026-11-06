@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
-import { Pause, Pencil, Play, Plus, Receipt } from 'lucide-react';
+import { Pause, Pencil, Play, Plus, Receipt, Trash2 } from 'lucide-react';
 import {
   goalSchema, recurringSchema, listGoals, createGoal, updateGoal, depositGoal,
-  listRecurring, createRecurring, toggleRecurring, payRecurring, listAccounts, money,
-  type Goal, type GoalForm, type RecurringForm,
+  listRecurring, createRecurring, updateRecurring, deleteRecurring, toggleRecurring, payRecurring, listAccounts, money,
+  type Goal, type GoalForm, type Recurring, type RecurringForm,
 } from '@financial/core';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
@@ -37,7 +37,13 @@ export default function GoalsPage() {
     mutationFn: ({ id, a, accountId }: { id: number; a: string; accountId: number }) => depositGoal(id, a, accountId),
     onSuccess: () => { invG(); invA(); qc.invalidateQueries({ queryKey: ['ptx'] }); },
   });
+  const [editingRec, setEditingRec] = useState<Recurring | null>(null);
   const addR = useMutation({ mutationFn: createRecurring, onSuccess: invR });
+  const updR = useMutation({
+    mutationFn: ({ id, v }: { id: number; v: RecurringForm }) => updateRecurring(id, v),
+    onSuccess: invR,
+  });
+  const delR = useMutation({ mutationFn: deleteRecurring, onSuccess: invR });
   const togR = useMutation({ mutationFn: toggleRecurring, onSuccess: invR });
   const payR = useMutation({
     mutationFn: ({ id, accountId }: { id: number; accountId: number }) => payRecurring(id, accountId),
@@ -89,7 +95,7 @@ export default function GoalsPage() {
           {addG.isError && <p className="error-text">{(addG.error as Error)?.message}</p>}
           <div className="form-actions">
             <button type="button" className="btn" onClick={closeGoal}>{t('common.cancel')}</button>
-            <button type="submit" className="btn btn--primary">{t('common.create')}</button>
+            <button type="submit" className="btn btn--primary">{editingRec ? t('common.save') : t('common.create')}</button>
           </div>
         </form>
       </Modal>
@@ -178,11 +184,14 @@ export default function GoalsPage() {
 
       <div className="row-between" style={{ margin: 'var(--fp-space-5) 0 var(--fp-space-3)' }}>
         <h2>{t('goals.recurring')}</h2>
-        <button className="btn" onClick={() => setShowRec(true)}><Plus size={16} aria-hidden="true" />{t('common.create')}</button>
+        <button className="btn" onClick={() => { setEditingRec(null); fR.reset({ name: '', amount: '', type: 2, frequency: 'Mensual' }); setShowRec(true); }}><Plus size={16} aria-hidden="true" />{t('common.create')}</button>
       </div>
 
-      <Modal open={showRec} onClose={closeRec} title={t('goals.recurring')}>
-        <form onSubmit={fR.handleSubmit((f) => addR.mutate({ ...f, active: true }, { onSuccess: closeRec }))}>
+      <Modal open={showRec} onClose={closeRec} title={editingRec ? t('common.edit') : t('goals.recurring')}>
+        <form onSubmit={fR.handleSubmit((f) => {
+          if (editingRec) updR.mutate({ id: editingRec.id, v: f }, { onSuccess: closeRec });
+          else addR.mutate({ ...f, active: true }, { onSuccess: closeRec });
+        })}>
           <div className="field">
             <label htmlFor="rec-name">{t('common.name')}</label>
             <input id="rec-name" {...fR.register('name')} />
@@ -203,9 +212,10 @@ export default function GoalsPage() {
             <select id="rec-freq" {...fR.register('frequency')}><option>Semanal</option><option>Mensual</option><option>Anual</option></select>
           </div>
           {addR.isError && <p className="error-text">{(addR.error as Error)?.message}</p>}
+          {updR.isError && <p className="error-text">{(updR.error as Error)?.message}</p>}
           <div className="form-actions">
             <button type="button" className="btn" onClick={closeRec}>{t('common.cancel')}</button>
-            <button type="submit" className="btn btn--primary">{t('common.create')}</button>
+            <button type="submit" className="btn btn--primary">{editingRec ? t('common.save') : t('common.create')}</button>
           </div>
         </form>
       </Modal>
@@ -226,6 +236,21 @@ export default function GoalsPage() {
                 <button className="btn btn--sm" onClick={() => togR.mutate(r.id)}>
                   {r.active ? <Pause size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
                   {r.active ? t('goals.pause') : t('goals.activate')}
+                </button>
+                <button className="btn btn--sm" title={t('common.edit')} aria-label={t('common.edit')} onClick={() => {
+                  setEditingRec(r);
+                  fR.reset({
+                    name: r.name,
+                    amount: String(r.amount),
+                    type: (r.type === 1 ? 1 : 2) as 1 | 2,
+                    frequency: (r.frequencyName as RecurringForm['frequency']) ?? 'Mensual',
+                  });
+                  setShowRec(true);
+                }}>
+                  <Pencil size={15} aria-hidden="true" />
+                </button>
+                <button className="btn btn--sm btn--danger" title={t('common.delete')} aria-label={t('common.delete')} onClick={() => delR.mutate(r.id)}>
+                  <Trash2 size={15} aria-hidden="true" />
                 </button>
               </span>
             </li>
