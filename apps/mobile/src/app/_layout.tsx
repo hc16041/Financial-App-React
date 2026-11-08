@@ -3,7 +3,7 @@ import { View, AppState } from 'react-native';
 import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
-import { setToken, getToken, sessionStore, useAuth, listAccounts, listCards, listCategories } from '@financial/core';
+import { clearSession, getToken, sessionStore, useAuth, listAccounts, listCards, listCategories } from '@financial/core';
 import { configureMobileApi } from '@/lib/api';
 import { saveCache } from '@/lib/cache';
 import { useLock } from '@/lib/lock';
@@ -18,7 +18,7 @@ let currentPath = '';
 
 // Se configura antes de montar pantallas: el core no conoce el router.
 configureMobileApi(() => {
-  setToken(null);
+  clearSession();
   useAuth.setState({ token: null, username: null });
   if (currentPath.startsWith('/login')) return;
   router.replace('/login');
