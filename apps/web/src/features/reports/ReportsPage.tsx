@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Download, Receipt, Store, TrendingUp } from 'lucide-react';
-import { getMerchantsExpenses, getCashExpenses, getInvestmentsMonthly, money } from '@financial/core';
-import { MonthlyBars } from '../../components/Charts';
+import { CreditCard, Download, Receipt, Store, TrendingUp } from 'lucide-react';
+import { getMerchantsExpenses, getCashExpenses, getInvestmentsMonthly, getCardsConsumption, money, type CardConsumption } from '@financial/core';
+import { Donut, MonthlyBars, NameValueBars } from '../../components/Charts';
 import KpiCard from '../../components/KpiCard';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
@@ -30,6 +30,8 @@ type CashReport = {
 type MonthlyRow = { month: number; totalIngresos: string; totalRetiros: string; netBalance: string; ingresoCount: number; retiroCount: number };
 type InvestReport = { year: number; monthlySummaries: MonthlyRow[]; totalIngresos: string; totalRetiros: string; netBalance: string };
 
+type Kind = 'merchants' | 'cash' | 'investments' | 'cards';
+
 const rowKeys = (rows: Row[]) => [...new Set(rows.flatMap((r) => Object.keys(r)))];
 
 function toCsv(rows: Row[]): string {
@@ -53,57 +55,74 @@ function downloadCsv(filename: string, csv: string) {
 
 const Empty = ({ text }: { text: string }) => <p className="empty-state"><Receipt size={16} aria-hidden="true" />{text}</p>;
 
+const PALETTE = ['var(--fp-danger)', 'var(--fp-accent)', 'var(--fp-success)', '#0ea5e9', '#a855f7', '#f59e0b', '#14b8a6'];
+
 export default function ReportsPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const [range, setRange] = useState(month);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [kind, setKind] = useState<'merchants' | 'cash' | 'investments'>('merchants');
+  const [kind, setKind] = useState<Kind>('merchants');
   const q = useQuery({
     queryKey: ['reports', kind, range, year],
     queryFn: () =>
       kind === 'merchants' ? getMerchantsExpenses(range.from, range.to)
       : kind === 'cash' ? getCashExpenses(range.from, range.to)
+      : kind === 'cards' ? getCardsConsumption(range.from, range.to)
       : getInvestmentsMonthly(year),
     retry: false,
   });
 
-  const data = q.data as MerchantReport & CashReport & InvestReport | undefined;
+  const data = q.data as (MerchantReport & CashReport & InvestReport) | CardConsumption[] | undefined;
+  const cards = Array.isArray(data) ? (data as CardConsumption[]) : [];
+  const obj = (!Array.isArray(data) ? data : undefined) as (MerchantReport & CashReport & InvestReport) | undefined;
 
   // Filas exportables y de tabla, ya en su forma final por tipo de reporte.
   const csvRows: Row[] = !data ? []
-    : kind === 'merchants' ? (data.merchants ?? []).map((r) => ({
+    : kind === 'merchants' ? (obj?.merchants ?? []).map((r) => ({
         [t('reports.merchant')]: r.merchantName,
         [t('common.category')]: r.category,
         [t('common.total')]: r.totalAmount,
         [t('reports.count')]: r.transactionCount,
         [t('reports.share')]: r.percentageOfTotal,
       }))
-    : kind === 'cash' ? (data.expenses ?? []).map((r) => ({
+    : kind === 'cash' ? (obj?.expenses ?? []).map((r) => ({
         [t('common.date')]: fmtDate(r.transactionDate, locale),
         [t('common.description')]: r.description,
         [t('reports.merchant')]: r.merchantName,
         [t('common.amount')]: r.amount,
       }))
-    : (data.monthlySummaries ?? []).map((r) => ({
-        [t('budgets.month')]: monthYear(r.month, data.year, locale),
+    : kind === 'cards' ? cards.map((r) => ({
+        [t('reports.cards')]: r.bankName,
+        [t('reports.consumption')]: r.totalExpenses ?? 0,
+        [t('reports.income')]: r.totalPayments ?? 0,
+        [t('reports.count')]: r.transactionCount ?? 0,
+        [t('reports.utilization')]: r.utilizationPercentage ?? 0,
+      }))
+    : (obj?.monthlySummaries ?? []).map((r) => ({
+        [t('budgets.month')]: monthYear(r.month, obj?.year ?? year, locale),
         [t('reports.income')]: r.totalIngresos,
         [t('reports.withdrawals')]: r.totalRetiros,
         [t('reports.net')]: r.netBalance,
         [t('reports.count')]: r.ingresoCount + r.retiroCount,
       }));
 
-  const period = data && 'periodStart' in data && data.periodStart
-    ? `${fmtDate(data.periodStart, locale)} — ${fmtDate(data.periodEnd, locale)}`
+  const period = obj && 'periodStart' in obj && obj.periodStart
+    ? `${fmtDate(obj.periodStart, locale)} — ${fmtDate(obj.periodEnd, locale)}`
     : null;
+
+  const merchantTop = (obj?.merchants ?? []).slice(0, 10);
+  const cashTop = (obj?.expenses ?? []).slice(0, 12);
+  const cardsTotal = cards.reduce((a, c) => a + Number(c.totalExpenses ?? 0), 0);
 
   return (
     <section>
       <PageHead title={t('reports.title')} />
       <div className="toolbar">
-        <select value={kind} onChange={(e) => setKind(e.target.value as 'merchants' | 'cash' | 'investments')} aria-label={t('common.filter')}>
+        <select value={kind} onChange={(e) => setKind(e.target.value as Kind)} aria-label={t('common.filter')}>
           <option value="merchants">{t('reports.merchants')}</option>
           <option value="cash">{t('reports.cash')}</option>
+          <option value="cards">{t('reports.cards')}</option>
           <option value="investments">{t('reports.investments')}</option>
         </select>
         {kind === 'investments' ? (
@@ -127,35 +146,73 @@ export default function ReportsPage() {
           <>
             {period && <p style={{ color: 'var(--fp-text-muted)', fontSize: '0.8125rem', margin: '0 0 var(--fp-space-3)' }}>{t('reports.period')}: {period}</p>}
 
-            {kind === 'merchants' && (
+            {kind === 'merchants' && obj && (
               <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
-                <KpiCard label={t('reports.totalExpenses')} value={money(data.totalExpenses)} tone="out" icon={Receipt} />
-                <KpiCard label={t('reports.totalTx')} value={String(data.totalTransactions ?? 0)} icon={TrendingUp} />
-                <KpiCard label={t('reports.merchantsCount')} value={String(data.merchants?.length ?? 0)} icon={Store} />
+                <KpiCard label={t('reports.totalExpenses')} value={money(obj.totalExpenses)} tone="out" icon={Receipt} />
+                <KpiCard label={t('reports.totalTx')} value={String(obj.totalTransactions ?? 0)} icon={TrendingUp} />
+                <KpiCard label={t('reports.merchantsCount')} value={String(obj.merchants?.length ?? 0)} icon={Store} />
               </div>
             )}
 
-            {kind === 'cash' && (
+            {kind === 'cash' && obj && (
               <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
-                <KpiCard label={t('reports.totalExpenses')} value={money(data.totalExpenses)} tone="out" icon={Receipt} />
-                <KpiCard label={t('reports.totalTx')} value={String(data.transactionCount ?? 0)} icon={TrendingUp} />
+                <KpiCard label={t('reports.totalExpenses')} value={money(obj.totalExpenses)} tone="out" icon={Receipt} />
+                <KpiCard label={t('reports.totalTx')} value={String(obj.transactionCount ?? 0)} icon={TrendingUp} />
               </div>
             )}
 
-            {kind === 'investments' && (
+            {kind === 'cards' && (
               <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
-                <KpiCard label={t('reports.income')} value={money(data.totalIngresos)} tone="in" icon={TrendingUp} />
-                <KpiCard label={t('reports.withdrawals')} value={money(data.totalRetiros)} tone="out" icon={Receipt} />
-                <KpiCard label={t('reports.net')} value={money(data.netBalance)} icon={Store} />
+                <KpiCard label={t('reports.consumption')} value={money(cardsTotal)} tone="out" icon={CreditCard} />
+                <KpiCard label={t('reports.cards')} value={String(cards.length)} icon={Store} />
               </div>
             )}
 
-            {kind === 'investments' && (data.monthlySummaries?.length ?? 0) > 0 && (
+            {kind === 'investments' && obj && (
+              <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
+                <KpiCard label={t('reports.income')} value={money(obj.totalIngresos)} tone="in" icon={TrendingUp} />
+                <KpiCard label={t('reports.withdrawals')} value={money(obj.totalRetiros)} tone="out" icon={Receipt} />
+                <KpiCard label={t('reports.net')} value={money(obj.netBalance)} icon={Store} />
+              </div>
+            )}
+
+            {kind === 'merchants' && merchantTop.length > 0 && (
+              <div className="card" style={{ marginBottom: 'var(--fp-space-4)' }}>
+                <NameValueBars
+                  names={merchantTop.map((r) => r.merchantName || '—')}
+                  values={merchantTop.map((r) => Number(r.totalAmount ?? 0))}
+                  color="var(--fp-danger)"
+                  ariaLabel={t('reports.merchants')}
+                />
+              </div>
+            )}
+
+            {kind === 'cash' && cashTop.length > 0 && (
+              <div className="card" style={{ marginBottom: 'var(--fp-space-4)' }}>
+                <NameValueBars
+                  names={cashTop.map((r) => r.description || r.merchantName || fmtDate(r.transactionDate, locale))}
+                  values={cashTop.map((r) => Number(r.amount ?? 0))}
+                  color="var(--fp-danger)"
+                  ariaLabel={t('reports.cash')}
+                />
+              </div>
+            )}
+
+            {kind === 'cards' && cards.length > 0 && (
+              <div className="card" style={{ marginBottom: 'var(--fp-space-4)' }}>
+                <Donut
+                  segments={cards.map((r, i) => ({ name: r.bankName || `#${r.creditCardId}`, value: Number(r.totalExpenses ?? 0), color: PALETTE[i % PALETTE.length] }))}
+                  ariaLabel={t('reports.cards')}
+                />
+              </div>
+            )}
+
+            {kind === 'investments' && obj && (obj.monthlySummaries?.length ?? 0) > 0 && (
               <div className="card" style={{ marginBottom: 'var(--fp-space-4)' }}>
                 <MonthlyBars
-                  months={(data.monthlySummaries ?? []).map((r) => monthYear(r.month, data.year, locale))}
-                  income={(data.monthlySummaries ?? []).map((r) => Number(r.totalIngresos ?? 0))}
-                  expense={(data.monthlySummaries ?? []).map((r) => Number(r.totalRetiros ?? 0))}
+                  months={(obj.monthlySummaries ?? []).map((r) => monthYear(r.month, obj.year, locale))}
+                  income={(obj.monthlySummaries ?? []).map((r) => Number(r.totalIngresos ?? 0))}
+                  expense={(obj.monthlySummaries ?? []).map((r) => Number(r.totalRetiros ?? 0))}
                   ariaLabel={t('reports.monthlyAria')}
                 />
               </div>
@@ -168,11 +225,12 @@ export default function ReportsPage() {
                     <tr>
                       {kind === 'cash' && <><th>{t('common.date')}</th><th>{t('common.description')}</th><th>{t('reports.merchant')}</th><th>{t('common.amount')}</th></>}
                       {kind === 'merchants' && <><th>{t('reports.merchant')}</th><th>{t('common.category')}</th><th>{t('reports.count')}</th><th>{t('common.total')}</th><th>{t('reports.share')}</th></>}
+                      {kind === 'cards' && <><th>{t('reports.cards')}</th><th>{t('reports.consumption')}</th><th>{t('reports.income')}</th><th>{t('reports.count')}</th><th>{t('reports.utilization')}</th></>}
                       {kind === 'investments' && <><th>{t('budgets.month')}</th><th>{t('reports.income')}</th><th>{t('reports.withdrawals')}</th><th>{t('reports.net')}</th><th>{t('reports.count')}</th></>}
                     </tr>
                   </thead>
                   <tbody>
-                    {kind === 'cash' && (data.expenses ?? []).map((r) => (
+                    {kind === 'cash' && obj && (obj.expenses ?? []).map((r) => (
                       <tr key={r.transactionDate + r.description}>
                         <td>{fmtDate(r.transactionDate, locale)}</td>
                         <td>{r.description || '—'}</td>
@@ -180,7 +238,7 @@ export default function ReportsPage() {
                         <td className="ledger-figure">{money(r.amount)}</td>
                       </tr>
                     ))}
-                    {kind === 'merchants' && (data.merchants ?? []).map((r) => (
+                    {kind === 'merchants' && obj && (obj.merchants ?? []).map((r) => (
                       <tr key={r.merchantName + r.category}>
                         <td>{r.merchantName || '—'}</td>
                         <td>{r.category || '—'}</td>
@@ -189,9 +247,18 @@ export default function ReportsPage() {
                         <td className="ledger-figure">{Number(r.percentageOfTotal ?? 0).toFixed(1)}%</td>
                       </tr>
                     ))}
-                    {kind === 'investments' && (data.monthlySummaries ?? []).map((r) => (
+                    {kind === 'cards' && cards.map((r) => (
+                      <tr key={r.creditCardId}>
+                        <td>{r.bankName || '—'}</td>
+                        <td className="ledger-figure">{money(r.totalExpenses ?? 0)}</td>
+                        <td className="ledger-figure">{money(r.totalPayments ?? 0)}</td>
+                        <td className="ledger-figure">{r.transactionCount ?? 0}</td>
+                        <td className="ledger-figure">{Number(r.utilizationPercentage ?? 0).toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                    {kind === 'investments' && obj && (obj.monthlySummaries ?? []).map((r) => (
                       <tr key={r.month}>
-                        <td>{monthYear(r.month, data.year, locale)}</td>
+                        <td>{monthYear(r.month, obj.year, locale)}</td>
                         <td className="ledger-figure">{money(r.totalIngresos)}</td>
                         <td className="ledger-figure">{money(r.totalRetiros)}</td>
                         <td className="ledger-figure">{money(r.netBalance)}</td>

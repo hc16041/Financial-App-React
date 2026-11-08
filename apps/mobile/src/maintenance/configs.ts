@@ -4,7 +4,7 @@ import {
   platformsApi, withdrawalMethodsApi,
   listAccounts, createAccount, updateAccount, deleteAccount,
   listBudgets, createBudget, updateBudget, deleteBudget,
-  listGoals, createGoal, updateGoal,
+  listGoals, createGoal, updateGoal, deleteGoal,
   listCards, createCard, updateCard, deleteCard,
   listInvestments, createInvestment, updateInvestment, deleteInvestment,
   money,
@@ -176,6 +176,7 @@ export const MAINTENANCES: MaintenanceConfig[] = [
     fetch: () => listGoals() as unknown as Promise<Array<Record<string, unknown>>>,
     create: (v) => createGoal({ name: v.name, target: moneyStr(v.target), deadline: opt(v.deadline) ?? undefined }),
     update: (id, v) => updateGoal(id, { name: v.name, target: moneyStr(v.target), deadline: opt(v.deadline) ?? undefined }),
+    remove: (id) => deleteGoal(id),
     columns: [
       { key: 'name', label: 'Nombre' },
       { key: 'current', label: 'Actual', money: true },

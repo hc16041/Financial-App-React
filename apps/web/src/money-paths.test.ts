@@ -12,12 +12,19 @@ import {
   goalSchema,
   createGoal,
   updateGoal,
+  deleteGoal,
   depositGoal,
   createRecurring,
   toggleRecurring,
   payRecurring,
   investmentSchema,
   updateSavingTx, deleteSavingTx, updateCard, deleteCard, updateRecurring, deleteRecurring,
+  setSessionTokens,
+  clearSession,
+  getToken,
+  getRefreshToken,
+  configureApi,
+  listGoals,
   type PersonalTxForm,
 } from '@financial/core';
 
@@ -306,5 +313,83 @@ describe('correcciones: ahorros, tarjetas y recurrentes', () => {
     await deleteRecurring(2);
     expect(last().url).toContain('/api/goals/recurring/2');
     expect(last().init?.method).toBe('DELETE');
+  });
+});
+
+describe('P1: metas borrar y refresh automático', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    clearSession();
+    configureApi({ onUnauthorized: () => {} });
+  });
+
+  it('borra una meta por id', async () => {
+    stub({ deleted: true });
+    await deleteGoal(7);
+    expect(last().url).toContain('/api/goals/7');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('ante 401 renueva con refresh y reintenta una vez', async () => {
+    calls = [];
+    setSessionTokens('old-access', 'old-refresh');
+    let n = 0;
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        n++;
+        calls.push({ url, init });
+        if (url.endsWith('/api/goals') && n === 1) {
+          return { status: 401, ok: false, json: async () => ({}) } as Response;
+        }
+        if (url.endsWith('/api/Auth/refresh')) {
+          const b = JSON.parse(String(init?.body));
+          expect(b.refreshToken).toBe('old-refresh');
+          return { status: 200, ok: true, json: async () => ({ token: 'new-access', refreshToken: 'new-refresh' }) } as Response;
+        }
+        if (url.endsWith('/api/goals') && n === 3) {
+          expect(init?.headers && (init.headers as Record<string, string>).Authorization).toBe('Bearer new-access');
+          return { status: 200, ok: true, json: async () => [{ id: 1 }] } as Response;
+        }
+        return { status: 500, ok: false, json: async () => ({}) } as Response;
+      }),
+    );
+    const goals = await listGoals();
+    expect(goals).toHaveLength(1);
+    expect(getToken()).toBe('new-access');
+    expect(getRefreshToken()).toBe('new-refresh');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(calls.map((c) => c.url)).toEqual([
+      'http://localhost:5063/api/goals',
+      'http://localhost:5063/api/Auth/refresh',
+      'http://localhost:5063/api/goals',
+    ]);
+  });
+
+  it('si el refresh falla cierra sesión y no reintenta en bucle', async () => {
+    calls = [];
+    setSessionTokens('old-access', 'old-refresh');
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.endsWith('/api/goals')) {
+          return { status: 401, ok: false, json: async () => ({}) } as Response;
+        }
+        if (url.endsWith('/api/Auth/refresh')) {
+          return { status: 401, ok: false, json: async () => ({ detail: 'expirado' }) } as Response;
+        }
+        return { status: 500, ok: false, json: async () => ({}) } as Response;
+      }),
+    );
+    await expect(listGoals()).rejects.toMatchObject({ status: 401 });
+    expect(getToken()).toBeNull();
+    expect(getRefreshToken()).toBeNull();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(calls.filter((c) => c.url.endsWith('/api/Auth/refresh'))).toHaveLength(1);
   });
 });

@@ -5,7 +5,7 @@ import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Pause, Pencil, Play, Plus, Receipt, Trash2 } from 'lucide-react';
 import {
-  goalSchema, recurringSchema, listGoals, createGoal, updateGoal, depositGoal,
+  goalSchema, recurringSchema, listGoals, createGoal, updateGoal, deleteGoal, depositGoal,
   listRecurring, createRecurring, updateRecurring, deleteRecurring, toggleRecurring, payRecurring, listAccounts, money,
   type Goal, type GoalForm, type Recurring, type RecurringForm,
 } from '@financial/core';
@@ -37,6 +37,7 @@ export default function GoalsPage() {
     mutationFn: ({ id, a, accountId }: { id: number; a: string; accountId: number }) => depositGoal(id, a, accountId),
     onSuccess: () => { invG(); invA(); qc.invalidateQueries({ queryKey: ['ptx'] }); },
   });
+  const delG = useMutation({ mutationFn: deleteGoal, onSuccess: invG });
   const [editingRec, setEditingRec] = useState<Recurring | null>(null);
   const addR = useMutation({ mutationFn: createRecurring, onSuccess: invR });
   const updR = useMutation({
@@ -169,6 +170,9 @@ export default function GoalsPage() {
                   <span className="badge">{Math.round(progress(g))}%</span>
                   <button className="btn btn--sm" onClick={() => openEdit(g)} aria-label={t('common.edit')}>
                     <Pencil size={15} aria-hidden="true" />
+                  </button>
+                  <button className="btn btn--sm btn--danger" onClick={() => delG.mutate(g.id)} aria-label={t('common.delete')} title={t('common.delete')}>
+                    <Trash2 size={15} aria-hidden="true" />
                   </button>
                 </span>
               </div>

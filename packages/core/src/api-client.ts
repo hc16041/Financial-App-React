@@ -39,9 +39,23 @@ export const configureApi = (config: ApiConfig) => {
 
 export const getBaseUrl = () => baseUrl;
 
+const TOKEN_KEY = 'fa_token';
+const REFRESH_KEY = 'fa_refresh';
+
 export const setToken = (t: string | null) =>
-  t ? sessionStore().setItem('fa_token', t) : sessionStore().removeItem('fa_token');
-export const getToken = () => sessionStore().getItem('fa_token');
+  t ? sessionStore().setItem(TOKEN_KEY, t) : sessionStore().removeItem(TOKEN_KEY);
+export const getToken = () => sessionStore().getItem(TOKEN_KEY);
+
+export const setRefreshToken = (t: string | null) =>
+  t ? sessionStore().setItem(REFRESH_KEY, t) : sessionStore().removeItem(REFRESH_KEY);
+export const getRefreshToken = () => sessionStore().getItem(REFRESH_KEY);
+
+export const setSessionTokens = (token: string | null, refreshToken: string | null) => {
+  setToken(token);
+  setRefreshToken(refreshToken);
+};
+
+export const clearSession = () => setSessionTokens(null, null);
 
 export class ApiError extends Error {
   status: number;
@@ -53,7 +67,49 @@ export class ApiError extends Error {
   }
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+type RefreshPair = { token: string; refreshToken: string };
+
+let refreshPromise: Promise<string | null> | null = null;
+
+function isAuthCredentialPath(path: string) {
+  return /\/api\/Auth\/(refresh|login|register|biometric-login|forgot-password|reset-password)$/i.test(path);
+}
+
+async function doRefresh(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+  try {
+    const res = await fetch(`${baseUrl}/api/Auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    const pair = (await res.json()) as Partial<RefreshPair>;
+    if (!pair.token || !pair.refreshToken) return null;
+    setSessionTokens(pair.token, pair.refreshToken);
+    return pair.token;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshOnce(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+function unauthorized(): never {
+  clearSession();
+  onUnauthorized?.();
+  throw new ApiError(401, undefined, 'No autorizado');
+}
+
+async function req<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const token = getToken();
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -63,7 +119,21 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  if (res.status === 401) onUnauthorized?.();
+
+  if (res.status === 401) {
+    if (!retried && !isAuthCredentialPath(path) && getRefreshToken()) {
+      const next = await refreshOnce();
+      if (next) return req<T>(path, init, true);
+    }
+    if (isAuthCredentialPath(path) && path.toLowerCase().endsWith('/refresh')) {
+      unauthorized();
+    }
+    // Login/register/otros auth devuelven 401 por credenciales: propaga el error
+    // sin borrar sesión activa; el caller decide. Para rutas protegidas sin
+    // refresh válido, cierra sesión.
+    if (!isAuthCredentialPath(path)) unauthorized();
+  }
+
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {

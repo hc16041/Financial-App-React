@@ -65,6 +65,9 @@ export const updateGoal = (id: number, g: GoalForm) => {
 export const depositGoal = (id: number, amount: string | number, accountId: number) =>
   apiPost<Goal>(`/api/goals/${id}/deposit`, { amount: Number(amount), accountId });
 
+export const deleteGoal = (id: number) =>
+  apiDel<{ deleted: boolean }>(`/api/goals/${id}`);
+
 export const createRecurring = (r: RecurringForm) => {
   const v = recurringSchema.parse(r);
   return apiPost<Recurring>('/api/goals/recurring', {
