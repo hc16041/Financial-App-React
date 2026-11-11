@@ -18,6 +18,7 @@ const SECTIONS: { key: string; items: Item[] }[] = [
     { to: '/savings', key: 'savings', icon: PiggyBank },
     { to: '/accounts', key: 'accounts', icon: Landmark },
     { to: '/cards', key: 'cards', icon: CreditCard },
+    { to: '/liquidity', key: 'liquidity', icon: ArrowRightLeft },
     { to: '/invest', key: 'invest', icon: TrendingUp },
   ] },
   { key: 'order', items: [

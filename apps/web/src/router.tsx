@@ -17,6 +17,7 @@ const resRoute = createRoute({ getParentRoute: () => root, path: '/auth/reset', 
 const bioRoute = createRoute({ getParentRoute: () => root, path: '/settings/biometric', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/auth/BiometricPage')) });
 const profRoute = createRoute({ getParentRoute: () => root, path: '/profile', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/profile/ProfilePage')) });
 const dashRoute = createRoute({ getParentRoute: () => root, path: '/', beforeLoad: authed, component: DashboardPage });
+const liqRoute = createRoute({ getParentRoute: () => root, path: '/liquidity', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/liquidity/LiquidityPage')) });
 // Rutas pesadas en chunks separados: el bundle inicial queda solo con shell+dashboard.
 const savRoute = createRoute({ getParentRoute: () => root, path: '/savings', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/savings/SavingsPage')) });
 const merRoute = createRoute({ getParentRoute: () => root, path: '/merchants', beforeLoad: authed, component: lazyRouteComponent(() => import('./features/merchants/MerchantsPage')) });
@@ -42,5 +43,5 @@ const cenPermissionsRoute = cen('/centries/permissions', 'CentriesPermisos');
 const cenAuditRoute = cen('/centries/audit', 'CentriesBitacora');
 
 export const router = createRouter({
-  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, savRoute, merRoute, carRoute, txRoute, invRoute, platRoute, wmRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, loanRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
+  routeTree: root.addChildren([loginRoute, regRoute, forRoute, resRoute, bioRoute, profRoute, dashRoute, liqRoute, savRoute, merRoute, carRoute, txRoute, invRoute, platRoute, wmRoute, repRoute, catRoute, budRoute, accRoute, goaRoute, loanRoute, cenUsersRoute, cenInactiveRoute, cenProfilesRoute, cenPositionsRoute, cenPermissionsRoute, cenAuditRoute]),
 });
