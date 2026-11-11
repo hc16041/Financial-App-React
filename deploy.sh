@@ -31,8 +31,18 @@ esac
 cd "$(dirname "$0")"
 
 if [ "$HACER_WEB" = 1 ]; then
-  echo "==> Compilando web"
+  # Sin VITE_API_URL el bundle cae al fallback http://localhost:5063 y el
+  # login falla desde cualquier dispositivo que no sea el servidor.
+  VITE_API_URL="${VITE_API_URL:-https://api.ferthl.duckdns.org}"
+  export VITE_API_URL
+
+  echo "==> Compilando web (VITE_API_URL=$VITE_API_URL)"
   pnpm --filter web build >/dev/null
+
+  if ! grep -RqF "$VITE_API_URL" apps/web/dist/assets; then
+    echo "ERROR: el bundle web no contiene VITE_API_URL=$VITE_API_URL"
+    exit 1
+  fi
 
   echo "==> Subiendo web"
   TMP_WEB="/tmp/finanzas-web-$$.tgz"
