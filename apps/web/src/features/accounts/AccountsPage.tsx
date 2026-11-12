@@ -39,6 +39,20 @@ export default function AccountsPage() {
   const closeAcc = () => { setShowAcc(false); fAcc.reset(); };
   const closeTx = () => { setShowTx(false); setSource(''); fTx.reset(); };
 
+  // El select de origen muestra un valor por defecto, pero el formulario
+  // necesita accountId/creditCardId desde el inicio: si no, se envía sin
+  // origen y el backend responde "Elige una cuenta o una tarjeta".
+  const openTx = () => {
+    const firstAccount = accs.data?.[0];
+    const firstCard = cards.data?.[0];
+    const firstCategory = cats.data?.find((c) => c.isActive);
+    setSource(firstAccount ? `acc:${firstAccount.id}` : firstCard ? `card:${firstCard.id}` : '');
+    fTx.setValue('accountId', firstAccount?.id ?? null);
+    fTx.setValue('creditCardId', firstAccount ? null : firstCard?.id ?? null);
+    fTx.setValue('categoryId', firstCategory?.id ?? null);
+    setShowTx(true);
+  };
+
   if (accs.isPending || txs.isPending) return <Skeleton />;
   if (accs.isError || txs.isError) return <div><p className="error-text">{t('common.error')}</p><button className="btn btn--sm" onClick={() => { accs.refetch(); txs.refetch(); }}>{t('common.retry')}</button></div>;
 
@@ -50,7 +64,7 @@ export default function AccountsPage() {
         actions={
           <>
             <button className="btn" onClick={() => setShowAcc(true)}><Plus size={16} aria-hidden="true" />{t('accounts.newAccount')}</button>
-            <button className="btn btn--primary" onClick={() => { setSource(`acc:${accs.data?.[0]?.id ?? ''}`); setShowTx(true); }}><ArrowLeftRight size={16} aria-hidden="true" />{t('accounts.movement')}</button>
+            <button className="btn btn--primary" onClick={openTx} disabled={!accs.data?.length && !cards.data?.length}><ArrowLeftRight size={16} aria-hidden="true" />{t('accounts.movement')}</button>
           </>
         }
       />
