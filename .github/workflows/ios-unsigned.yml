@@ -60,7 +60,8 @@ jobs:
             echo "::error title=xcodebuild -list failed::$(tail -n 1 xcodebuild-list.err)"
             exit $LIST_CODE
           fi
-          SCHEME=$(python3 -c "import json; print(json.load(open('xcodebuild-list.json'))['workspace']['schemes'][0])")
+          SCHEME=$(python3 -c "import json,sys; d=json.load(open('xcodebuild-list.json')); s=d['workspace']['schemes']; a=sys.argv[1]; print(next((x for x in s if x.lower()==a.lower()), next((x for x in s if not x.lower().startswith('pods-')), s[0])))" "$(basename "$WORKSPACE" .xcworkspace)")
+          echo "Schemes: $(python3 -c "import json; print(json.load(open('xcodebuild-list.json'))['workspace']['schemes'])")"
           echo "Scheme: $SCHEME"
           xcodebuild \
             -workspace "$WORKSPACE" \
