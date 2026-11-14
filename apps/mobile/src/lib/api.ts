@@ -27,5 +27,14 @@ const secureStore: KeyValue = {
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5063';
 
+// Mismo tope que la web: pasadas 8 h desde el login no se renueva el token y
+// la app vuelve al login (biometría o contraseña).
+const SESSION_MAX_MS = 8 * 60 * 60 * 1000;
+
 export const configureMobileApi = (onUnauthorized: () => void) =>
-  configureApi({ baseUrl: API_URL, storage: secureStore, onUnauthorized });
+  configureApi({
+    baseUrl: API_URL,
+    storage: secureStore,
+    onUnauthorized,
+    sessionMaxMs: SESSION_MAX_MS,
+  });
