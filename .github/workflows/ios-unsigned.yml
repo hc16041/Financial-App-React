@@ -50,11 +50,17 @@ jobs:
       - name: Build unsigned app
         working-directory: apps/mobile
         run: |
-          set -euo pipefail
+          set -uo pipefail
           WORKSPACE=$(ls ios/*.xcworkspace | head -n 1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['workspace']['schemes'][0])")
           echo "Workspace: $WORKSPACE"
+          xcodebuild -workspace "$WORKSPACE" -list -json > xcodebuild-list.json 2> xcodebuild-list.err
+          LIST_CODE=$?
+          cat xcodebuild-list.err || true
+          if [ $LIST_CODE -ne 0 ]; then
+            echo "::error title=xcodebuild -list failed::$(tail -n 1 xcodebuild-list.err)"
+            exit $LIST_CODE
+          fi
+          SCHEME=$(python3 -c "import json; print(json.load(open('xcodebuild-list.json'))['workspace']['schemes'][0])")
           echo "Scheme: $SCHEME"
           xcodebuild \
             -workspace "$WORKSPACE" \
@@ -67,7 +73,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            -quiet
+            -quiet > xcodebuild.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            echo "xcodebuild failed with exit code $CODE"
+            tail -n 120 xcodebuild.log
+            {
+              echo "### xcodebuild failed ($CODE)"
+              echo '```'
+              tail -n 120 xcodebuild.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=xcodebuild failed::$(grep -m1 -E 'error:|The following build commands failed' xcodebuild.log | head -c 300 || tail -n 1 xcodebuild.log | head -c 300)"
+            exit $CODE
+          fi
 
       - name: Package IPA
         working-directory: apps/mobile
