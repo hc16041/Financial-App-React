@@ -51,7 +51,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           set -uo pipefail
-          WORKSPACE=$(ls ios/*.xcworkspace | head -n 1)
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
           echo "Workspace: $WORKSPACE"
           xcodebuild -workspace "$WORKSPACE" -list -json > xcodebuild-list.json 2> xcodebuild-list.err
           LIST_CODE=$?
