@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { View, AppState } from 'react-native';
+import { View, AppState, Platform } from 'react-native';
 import { Stack, router, usePathname, ThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Updates from 'expo-updates';
 import { clearSession, getToken, sessionStore, useAuth, listAccounts, listCards, listCategories } from '@financial/core';
 import { configureMobileApi } from '@/lib/api';
 import { saveCache } from '@/lib/cache';
@@ -59,6 +60,23 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
+  // OTA: al abrir, buscar una actualización de JS/assets y aplicarla. Los
+  // cambios nativos (nuevo módulo, permisos, SDK) siguen requiriendo un
+  // build nuevo de APK/IPA.
+  useEffect(() => {
+    if (__DEV__ || Platform.OS === 'web' || !Updates.isEnabled) return;
+    void (async () => {
+      try {
+        const check = await Updates.checkForUpdateAsync();
+        if (!check.isAvailable) return;
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } catch {
+        // Sin red o actualización inválida: se sigue con el bundle actual.
+      }
+    })();
   }, []);
 
   // Con sesión activa se precalientan los catálogos: sin ellos la captura no

@@ -7,6 +7,18 @@
     "icon": "./assets/images/icon.png",
     "scheme": "libromayor",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1ba42b9c-02a8-4136-9944-90ea6b9cf76f",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
+    },
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.finanzas.libromayor",
