@@ -23,24 +23,29 @@ export const sessionStore = (): KeyValue => {
 
 let baseUrl = 'http://localhost:5063';
 let onUnauthorized: (() => void) | null = null;
+let sessionMaxMs = 0;
 
 export type ApiConfig = {
   baseUrl?: string;
   storage?: KeyValue;
   /** Qué hacer ante un 401. La web redirige al login; RN limpia la sesión. */
   onUnauthorized?: () => void;
+  /** Duración máxima de la sesión desde el login; 0 = sin tope. */
+  sessionMaxMs?: number;
 };
 
 export const configureApi = (config: ApiConfig) => {
   if (config.baseUrl) baseUrl = config.baseUrl.replace(/\/+$/, '');
   if (config.storage) sessionOverride = config.storage;
   if (config.onUnauthorized) onUnauthorized = config.onUnauthorized;
+  if (config.sessionMaxMs !== undefined) sessionMaxMs = config.sessionMaxMs;
 };
 
 export const getBaseUrl = () => baseUrl;
 
 const TOKEN_KEY = 'fa_token';
 const REFRESH_KEY = 'fa_refresh';
+const LOGIN_AT_KEY = 'fa_login_at';
 
 export const setToken = (t: string | null) =>
   t ? sessionStore().setItem(TOKEN_KEY, t) : sessionStore().removeItem(TOKEN_KEY);
@@ -53,6 +58,14 @@ export const getRefreshToken = () => sessionStore().getItem(REFRESH_KEY);
 export const setSessionTokens = (token: string | null, refreshToken: string | null) => {
   setToken(token);
   setRefreshToken(refreshToken);
+  // El inicio de sesión se marca solo cuando aparece un token y no había uno:
+  // un refresh no reinicia la ventana de 8 h.
+  if (token && !sessionStore().getItem(LOGIN_AT_KEY)) {
+    sessionStore().setItem(LOGIN_AT_KEY, String(Date.now()));
+  }
+  if (!token) {
+    sessionStore().removeItem(LOGIN_AT_KEY);
+  }
 };
 
 export const clearSession = () => setSessionTokens(null, null);
@@ -78,6 +91,13 @@ function isAuthCredentialPath(path: string) {
 async function doRefresh(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
+  if (sessionMaxMs > 0) {
+    const started = Number(sessionStore().getItem(LOGIN_AT_KEY) ?? 0);
+    if (started > 0 && Date.now() - started >= sessionMaxMs) {
+      clearSession();
+      return null;
+    }
+  }
   try {
     const res = await fetch(`${baseUrl}/api/Auth/refresh`, {
       method: 'POST',

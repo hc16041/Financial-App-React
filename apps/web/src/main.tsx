@@ -2,47 +2,55 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
-import { configureApi, setToken, getToken, sessionStore, useAuth } from '@financial/core'
+import { configureApi, clearSession, getToken, sessionStore, useAuth } from '@financial/core'
+import { cookieStore, onAuthChange } from './lib/cookie-store'
 import { router } from './router'
 import i18n from './i18n'
 import { useToasts } from './components/toast'
 import Toaster from './components/Toaster'
 import './index.css'
 
-// Única configuración del core para la web: base URL desde Vite, la sesión vive
-// en localStorage (compartida entre pestañas) y un 401 fuera de /auth redirige al login.
+// Única configuración del core para la web: base URL desde Vite y sesión en una
+// cookie de sesión (compartida entre pestañas, se borra al cerrar el navegador).
+// La sesión dura como máximo 8 h desde el login; después se vuelve a entrar.
+const EIGHT_HOURS = 8 * 60 * 60 * 1000
 configureApi({
   baseUrl: import.meta.env.VITE_API_URL,
-  storage: typeof localStorage !== 'undefined' ? localStorage : undefined,
+  storage: cookieStore,
+  sessionMaxMs: EIGHT_HOURS,
   onUnauthorized: () => {
     if (typeof location === 'undefined' || location.pathname.startsWith('/auth/')) return
-    setToken(null)
+    clearSession()
     location.href = '/auth/login'
   },
 })
 
-// Migración: la versión anterior guardaba la sesión en sessionStorage (por pestaña).
-// Se copia una vez a localStorage para no obligar a loguearse de nuevo y para que
-// una pestaña nueva comparta la sesión.
-if (typeof localStorage !== 'undefined' && typeof sessionStorage !== 'undefined') {
-  for (const key of ['fa_token', 'fa_refresh', 'fa_user']) {
-    const value = sessionStorage.getItem(key)
-    if (value && !localStorage.getItem(key)) localStorage.setItem(key, value)
-    sessionStorage.removeItem(key)
-  }
+// Migración: versiones anteriores guardaban la sesión en localStorage/sessionStorage.
+// Se copia una vez a la cookie para no obligar a loguearse de nuevo.
+for (const key of ['fa_token', 'fa_refresh', 'fa_user']) {
+  if (cookieStore.getItem(key)) continue
+  const value =
+    (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null) ??
+    (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(key) : null)
+  if (value) cookieStore.setItem(key, value)
+}
+if (typeof localStorage !== 'undefined') {
+  for (const key of ['fa_token', 'fa_refresh', 'fa_user']) localStorage.removeItem(key)
+}
+if (typeof sessionStorage !== 'undefined') {
+  for (const key of ['fa_token', 'fa_refresh', 'fa_user']) sessionStorage.removeItem(key)
+}
+if (cookieStore.getItem('fa_token') && !cookieStore.getItem('fa_login_at')) {
+  cookieStore.setItem('fa_login_at', String(Date.now()))
 }
 useAuth.setState({ token: getToken(), username: sessionStore().getItem('fa_user') })
 
-// Si otra pestaña inicia o cierra sesión, esta se mantiene alineada.
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'fa_token') {
-      useAuth.setState({ token: e.newValue })
-      if (!e.newValue && !location.pathname.startsWith('/auth/')) location.href = '/auth/login'
-    }
-    if (e.key === 'fa_user') useAuth.setState({ username: e.newValue })
-  })
-}
+// Las cookies no disparan `storage`: el adaptador avisa por BroadcastChannel.
+onAuthChange(() => {
+  const token = getToken()
+  useAuth.setState({ token, username: sessionStore().getItem('fa_user') })
+  if (!token && !location.pathname.startsWith('/auth/')) location.href = '/auth/login'
+})
 
 // Un solo punto de aviso: cualquier mutación que falle o tenga éxito notifica.
 const qc = new QueryClient({
