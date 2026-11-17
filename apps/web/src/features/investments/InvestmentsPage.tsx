@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { Pencil, Plus, Trash2, TrendingUp } from 'lucide-react';
 import {
   listInvestments, createInvestment, updateInvestment, deleteInvestment,
-  listPlatforms, listWithdrawalMethods, investmentSchema, type Investment, type InvestmentForm,
+  platformsApi, withdrawalMethodsApi, investmentSchema, money, commissionFor,
+  type Investment, type InvestmentForm,
 } from '@financial/core';
 import { listCards } from '@financial/core';
 import KpiCard from '../../components/KpiCard';
@@ -15,14 +16,17 @@ import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
 
+// Un <select> devuelve '' cuando no hay opción elegida; el schema espera number | null.
+const toNullableNumber = (v: unknown) => (v === '' || v == null ? null : Number(v));
+
 export default function InvestmentsPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Investment | null>(null);
   const [showForm, setShowForm] = useState(false);
   const q = useQuery({ queryKey: ['investments'], queryFn: listInvestments, retry: false });
-  const plats = useQuery({ queryKey: ['platforms'], queryFn: listPlatforms });
-  const methods = useQuery({ queryKey: ['withdrawalMethods'], queryFn: listWithdrawalMethods });
+  const plats = useQuery({ queryKey: ['platforms'], queryFn: platformsApi.list });
+  const methods = useQuery({ queryKey: ['withdrawalMethods'], queryFn: withdrawalMethodsApi.list });
   const cards = useQuery({ queryKey: ['cards', 'list'], queryFn: listCards, retry: false });
   const inv = () => qc.invalidateQueries({ queryKey: ['investments'] });
   const create = useMutation({ mutationFn: createInvestment, onSuccess: inv });
@@ -31,28 +35,55 @@ export default function InvestmentsPage() {
     onSuccess: inv,
   });
   const remove = useMutation({ mutationFn: deleteInvestment, onSuccess: inv });
-  const { register, handleSubmit, reset, setValue } = useForm<InvestmentForm>({
+  const { register, handleSubmit, reset, setValue, getValues } = useForm<InvestmentForm>({
     // commission tiene default en el schema: en el formulario siempre llega definido.
     resolver: zodT(investmentSchema) as unknown as Resolver<InvestmentForm>,
     defaultValues: { transactionType: 2, transactionDate: new Date().toISOString().slice(0, 10), commission: '0' },
   });
+  // "Libre de comisión" no se persiste: el backend no tiene columna. Es un atajo
+  // que fuerza comisión 0 al enviar.
+  const [libre, setLibre] = useState(false);
 
   const items: Investment[] = Array.isArray(q.data) ? q.data : [];
   const total = items.reduce((a, x) => a + Number(x.total ?? 0), 0);
   const opt = (v: string | number | null | undefined) => (v === '' || v == null ? undefined : Number(v));
 
-  const close = () => { setShowForm(false); setEditing(null); reset(); };
-  const openCreate = () => { setEditing(null); reset(); setShowForm(true); };
+  const close = () => { setShowForm(false); setEditing(null); setLibre(false); reset(); };
+  const openCreate = () => { setEditing(null); setLibre(false); reset(); setShowForm(true); };
+
+  // La comisión se recalcula al cambiar monto, tipo o método; el usuario puede
+  // sobrescribirla después salvo que la regla diga que no puede deducirse.
+  const recalcCommission = (free = libre) => {
+    const v = getValues();
+    const method = (methods.data ?? []).find((m) => m.id === Number(v.withdrawalMethodId));
+    const result = commissionFor({
+      amount: v.amount ?? '',
+      transactionType: v.transactionType === 1 ? 1 : 2,
+      methodName: method?.name,
+      requiresCreditCard: method?.requiresCreditCard,
+      libreDeComision: free,
+    });
+    if (result.auto) setValue('commission', result.commission.toFixed(2));
+  };
+
   const openEdit = (x: Investment) => {
     setEditing(x);
     setValue('platformId', x.platformId); setValue('amount', String(x.amount));
     setValue('commission', String(x.commission)); setValue('transactionType', x.transactionType === 1 ? 1 : 2);
     setValue('transactionDate', String(x.transactionDate ?? '').slice(0, 10));
+    setValue('withdrawalMethodId', x.withdrawalMethodId ?? null);
+    setValue('creditCardId', x.creditCardId ?? null);
+    setLibre(false);
     setShowForm(true);
   };
 
   const submit = (f: InvestmentForm) => {
-    const body: InvestmentForm = { ...f, withdrawalMethodId: opt(f.withdrawalMethodId), creditCardId: opt(f.creditCardId) };
+    const body: InvestmentForm = {
+      ...f,
+      commission: libre ? '0' : f.commission,
+      withdrawalMethodId: opt(f.withdrawalMethodId),
+      creditCardId: opt(f.creditCardId),
+    };
     if (editing) update.mutate({ id: editing.id, v: body }, { onSuccess: close });
     else create.mutate(body, { onSuccess: close });
   };
@@ -69,7 +100,7 @@ export default function InvestmentsPage() {
       />
 
       <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
-        <KpiCard label={t('invest.total')} value={total.toFixed(2)} tone="in" icon={TrendingUp} />
+        <KpiCard label={t('invest.total')} value={money(total)} tone="in" icon={TrendingUp} />
       </div>
 
       <Modal open={showForm} onClose={close} title={editing ? t('common.edit') : t('common.create')}>
@@ -82,15 +113,26 @@ export default function InvestmentsPage() {
           </div>
           <div className="field">
             <label htmlFor="inv-amount">{t('common.amount')}</label>
-            <input id="inv-amount" {...register('amount')} inputMode="decimal" />
+            <input id="inv-amount" {...register('amount', { onChange: () => recalcCommission() })} inputMode="decimal" />
           </div>
           <div className="field">
             <label htmlFor="inv-comm">{t('common.commission')}</label>
             <input id="inv-comm" {...register('commission')} inputMode="decimal" />
           </div>
           <div className="field">
+            <label htmlFor="inv-free" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                id="inv-free"
+                type="checkbox"
+                checked={libre}
+                onChange={(e) => { setLibre(e.target.checked); recalcCommission(e.target.checked); }}
+              />
+              {t('invest.commissionFree')}
+            </label>
+          </div>
+          <div className="field">
             <label htmlFor="inv-type">{t('common.type')}</label>
-            <select id="inv-type" {...register('transactionType', { valueAsNumber: true })}>
+            <select id="inv-type" {...register('transactionType', { valueAsNumber: true, onChange: () => recalcCommission() })}>
               <option value={2}>{t('invest.income')}</option>
               <option value={1}>{t('invest.withdraw')}</option>
             </select>
@@ -100,17 +142,17 @@ export default function InvestmentsPage() {
             <input id="inv-date" {...register('transactionDate')} type="date" />
           </div>
           <div className="field">
-            <label htmlFor="inv-method">{t('invest.noMethod')}</label>
-            <select id="inv-method" {...register('withdrawalMethodId')}>
+            <label htmlFor="inv-method">{t('invest.method')}</label>
+            <select id="inv-method" {...register('withdrawalMethodId', { setValueAs: toNullableNumber, onChange: () => recalcCommission() })}>
               <option value="">{t('invest.noMethod')}</option>
               {(methods.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div className="field">
-            <label htmlFor="inv-card">{t('invest.noCard')}</label>
-            <select id="inv-card" {...register('creditCardId')}>
+            <label htmlFor="inv-card">{t('invest.card')}</label>
+            <select id="inv-card" {...register('creditCardId', { setValueAs: toNullableNumber })}>
               <option value="">{t('invest.noCard')}</option>
-              {(Array.isArray(cards.data) ? cards.data : []).map((c) => <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>)}
+              {(Array.isArray(cards.data) ? cards.data : []).map((c) => <option key={c.id} value={c.id}>{String(c.bankName ?? c.name ?? `#${c.id}`)}</option>)}
             </select>
           </div>
           {(create.isError || update.isError) && <p className="error-text">{((create.error ?? update.error) as Error)?.message}</p>}
@@ -137,9 +179,9 @@ export default function InvestmentsPage() {
             platform: (x.platformName ?? `#${x.platformId}`) as string,
             date: String(x.transactionDate ?? '').slice(0, 10),
             kind: Number(x.transactionType) === 2 ? t('invest.income') : t('invest.withdraw'),
-            amount: Number(x.amount).toFixed(2),
-            commission: Number(x.commission).toFixed(2),
-            total: Number(x.total).toFixed(2),
+            amount: x.amount,
+            commission: x.commission,
+            total: x.total,
           }))}
           searchKeys={['platform']}
           emptyText={t('common.empty')}

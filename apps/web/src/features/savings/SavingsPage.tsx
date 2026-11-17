@@ -3,29 +3,32 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react';
 import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
+import KpiCard from '../../components/KpiCard';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { fmtDate } from '../../lib/date';
 import {
-  getBalance, getHistory, postTx, normBalance,
-  savingTxSchema, type SavingTxForm,
+  getBalance, getHistory, postTx, updateSavingTx, deleteSavingTx, normBalance, money, sumMoney,
+  savingTxSchema, type SavingTx, type SavingTxForm,
 } from '@financial/core';
 
 export default function SavingsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<SavingTx | null>(null);
   const bal = useQuery({ queryKey: ['savings', 'balance'], queryFn: getBalance, retry: false });
   const hist = useQuery({ queryKey: ['savings', 'history'], queryFn: getHistory, retry: false });
-  const mut = useMutation({
-    mutationFn: postTx,
-    onSuccess: () => {
-      setShowForm(false);
-      qc.invalidateQueries({ queryKey: ['savings'] });
-    },
+  const inv = () => qc.invalidateQueries({ queryKey: ['savings'] });
+  const mut = useMutation({ mutationFn: postTx, onSuccess: () => { setShowForm(false); inv(); } });
+  const upd = useMutation({
+    mutationFn: ({ id, v }: { id: number; v: SavingTxForm }) => updateSavingTx(id, v),
+    onSuccess: () => { setShowForm(false); setEditing(null); inv(); },
   });
+  const del = useMutation({ mutationFn: deleteSavingTx, onSuccess: inv });
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<SavingTxForm>({
     resolver: zodT(savingTxSchema),
@@ -34,7 +37,23 @@ export default function SavingsPage() {
 
   const balance = normBalance(bal.data);
   const txs = Array.isArray(hist.data) ? hist.data : [];
-  const close = () => { setShowForm(false); reset(); };
+  const sumOf = (type: 1 | 2) => sumMoney(txs.filter((x) => x.transactionType === type).map((x) => String(x.amount)));
+  const close = () => { setShowForm(false); setEditing(null); reset(); };
+  const openCreate = () => { setEditing(null); reset({ date: new Date().toISOString().slice(0, 10), transactionType: 1, amount: '', description: '' }); setShowForm(true); };
+  const openEdit = (tx: SavingTx) => {
+    setEditing(tx);
+    reset({
+      date: String(tx.date).slice(0, 10),
+      amount: String(tx.amount),
+      description: tx.description,
+      transactionType: tx.transactionType === 2 ? 2 : 1,
+    });
+    setShowForm(true);
+  };
+  const submit = (f: SavingTxForm) => {
+    if (editing) upd.mutate({ id: editing.id, v: f });
+    else mut.mutate(f);
+  };
 
   if (bal.isPending || hist.isPending) return <Skeleton />;
   if (bal.isError || hist.isError)
@@ -51,14 +70,20 @@ export default function SavingsPage() {
         title={t('savings.title')}
         actions={
           <>
-            <span className="badge">{t('savings.balance')}: <span className="ledger-figure">{balance ?? '—'}</span></span>
-            <button className="btn btn--primary" onClick={() => setShowForm(true)}><Plus size={16} aria-hidden="true" />{t('savings.new')}</button>
+            <span className="badge">{t('savings.balance')}: <span className="ledger-figure">{money(balance)}</span></span>
+            <button className="btn btn--primary" onClick={openCreate}><Plus size={16} aria-hidden="true" />{t('savings.new')}</button>
           </>
         }
       />
 
-      <Modal open={showForm} onClose={close} title={t('savings.new')}>
-        <form onSubmit={handleSubmit((f) => mut.mutate(f, { onSuccess: () => reset() }))}>
+      <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
+        <KpiCard label={t('savings.deposits')} value={money(sumOf(1))} tone="in" icon={ArrowDownToLine} />
+        <KpiCard label={t('savings.withdrawals')} value={money(sumOf(2))} tone="out" icon={ArrowUpFromLine} />
+        <KpiCard label={t('savings.movements')} value={String(txs.length)} icon={ListChecks} />
+      </div>
+
+      <Modal open={showForm} onClose={close} title={editing ? t('common.edit') : t('savings.new')}>
+        <form onSubmit={handleSubmit(submit)}>
           <div className="field">
             <label htmlFor="sav-date">{t('common.date')}</label>
             <input id="sav-date" {...register('date')} type="date" />
@@ -85,9 +110,10 @@ export default function SavingsPage() {
             </select>
           </div>
           {mut.isError && <p className="error-text">{(mut.error as Error).message}</p>}
+          {upd.isError && <p className="error-text">{(upd.error as Error).message}</p>}
           <div className="form-actions">
             <button type="button" className="btn" onClick={close}>{t('common.cancel')}</button>
-            <button type="submit" className="btn btn--primary" disabled={mut.isPending}>{mut.isPending ? t('common.loading') : t('common.save')}</button>
+            <button type="submit" className="btn btn--primary" disabled={mut.isPending || upd.isPending}>{(mut.isPending || upd.isPending) ? t('common.loading') : t('common.save')}</button>
           </div>
         </form>
       </Modal>
@@ -96,14 +122,18 @@ export default function SavingsPage() {
         <p className="empty-state">{t('savings.empty')}</p>
       ) : (
         <div className="table-wrap"><table className="ledger">
-          <thead><tr><th>{t('common.date')}</th><th>{t('common.description')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th></tr></thead>
+          <thead><tr><th>{t('common.date')}</th><th>{t('common.description')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th><th /></tr></thead>
           <tbody>
             {txs.map((tx) => (
               <tr key={tx.id} data-sign={tx.transactionType === 1 ? 'in' : 'out'}>
-                <td>{String(tx.date).slice(0, 10)}</td>
+                <td>{fmtDate(tx.date, i18n.language)}</td>
                 <td>{tx.description}</td>
                 <td>{tx.transactionType === 1 ? t('savings.deposit') : t('savings.withdrawal')}</td>
-                <td className="ledger-figure">{tx.amount}</td>
+                <td className="ledger-figure">{money(tx.amount)}</td>
+                <td style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn btn--sm" onClick={() => openEdit(tx)} title={t('common.edit')} aria-label={t('common.edit')}><Pencil size={15} aria-hidden="true" /></button>
+                  <button className="btn btn--sm btn--danger" onClick={() => del.mutate(tx.id)} title={t('common.delete')} aria-label={t('common.delete')}><Trash2 size={15} aria-hidden="true" /></button>
+                </td>
               </tr>
             ))}
           </tbody>

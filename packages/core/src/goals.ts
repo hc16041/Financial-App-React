@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiGet, apiPost, apiPut } from './api-client';
+import { apiDel, apiGet, apiPost, apiPut } from './api-client';
 import { moneyString } from './schemas';
 
 export const goalSchema = z.object({
@@ -13,6 +13,7 @@ export const recurringSchema = z.object({
   name: z.string().min(3, 'err.min3'),
   amount: moneyString,
   frequency: z.enum(['Semanal', 'Mensual', 'Anual']),
+  type: z.union([z.literal(1), z.literal(2)]).default(2),
   active: z.boolean().optional(),
 });
 export type RecurringForm = z.input<typeof recurringSchema>;
@@ -35,6 +36,8 @@ export type Recurring = {
   frequencyName: string;
   active: boolean;
   nextDue: string;
+  type?: number;
+  typeName?: string;
 };
 
 // El API usa 1/2/3; el formulario conserva las etiquetas en español.
@@ -62,14 +65,31 @@ export const updateGoal = (id: number, g: GoalForm) => {
 export const depositGoal = (id: number, amount: string | number, accountId: number) =>
   apiPost<Goal>(`/api/goals/${id}/deposit`, { amount: Number(amount), accountId });
 
+export const deleteGoal = (id: number) =>
+  apiDel<{ deleted: boolean }>(`/api/goals/${id}`);
+
 export const createRecurring = (r: RecurringForm) => {
   const v = recurringSchema.parse(r);
   return apiPost<Recurring>('/api/goals/recurring', {
     name: v.name,
     amount: Number(v.amount),
     frequency: FREQ[v.frequency],
+    type: v.type,
   });
 };
+export const updateRecurring = (id: number, r: RecurringForm) => {
+  const v = recurringSchema.parse(r);
+  return apiPut<Recurring>(`/api/goals/recurring/${id}`, {
+    name: v.name,
+    amount: Number(v.amount),
+    frequency: FREQ[v.frequency],
+    type: v.type,
+  });
+};
+
+export const deleteRecurring = (id: number) =>
+  apiDel<{ deleted: boolean }>(`/api/goals/recurring/${id}`);
+
 export const toggleRecurring = (id: number) => apiPut<Recurring>(`/api/goals/recurring/${id}/toggle`, {});
 
 /// Marca pagado: el backend registra el gasto en la cuenta y avanza NextDue.

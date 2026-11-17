@@ -14,3 +14,8 @@ export * from './cards';
 export * from './reports';
 export * from './transactions';
 export * from './investments';
+export * from './commission';
+export * from './cashflow';
+export * from './refs';
+export * from './loans';
+export * from './transfers';

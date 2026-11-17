@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { apiGet, apiPost } from './api-client';
+import { apiDel, apiGet, apiPost, apiPut } from './api-client';
 import { moneyString } from './schemas';
 
 export const savingTxSchema = z.object({
@@ -25,6 +25,16 @@ export const postTx = (b: SavingTxForm) =>
     ...b,
     transactionType: Number(b.transactionType),
   });
+
+// Corregir un movimiento ya registrado. El backend rechaza si dejara el saldo negativo.
+export const updateSavingTx = (id: number, b: SavingTxForm) =>
+  apiPut<{ id: number }>(`/api/savings/transactions/${id}`, {
+    ...b,
+    amount: Number(b.amount),
+    transactionType: Number(b.transactionType),
+  });
+
+export const deleteSavingTx = (id: number) => apiDel<{ deleted: boolean }>(`/api/savings/transactions/${id}`);
 
 // Normaliza {balance} | number | string → number
 export const normBalance = (b: unknown): number | null => {

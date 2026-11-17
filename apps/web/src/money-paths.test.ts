@@ -12,10 +12,19 @@ import {
   goalSchema,
   createGoal,
   updateGoal,
+  deleteGoal,
   depositGoal,
   createRecurring,
   toggleRecurring,
   payRecurring,
+  investmentSchema,
+  updateSavingTx, deleteSavingTx, updateCard, deleteCard, updateRecurring, deleteRecurring,
+  setSessionTokens,
+  clearSession,
+  getToken,
+  getRefreshToken,
+  configureApi,
+  listGoals,
   type PersonalTxForm,
 } from '@financial/core';
 
@@ -111,12 +120,32 @@ describe('movimientos de cuenta', () => {
     expect(last().url).toContain('/api/accounts/transactions');
     expect(body()).toEqual({
       accountId: 1,
+      creditCardId: null,
       categoryId: null,
       type: 2,
       amount: 25.5,
       date: '2026-10-02',
       note: '',
     });
+  });
+
+  it('con tarjeta manda la tarjeta y no la cuenta', async () => {
+    stub({ id: 2 });
+    await createTx(form({ accountId: null, creditCardId: 3 }));
+    expect(body()).toEqual({
+      accountId: null,
+      creditCardId: 3,
+      categoryId: 2,
+      type: 2,
+      amount: 25.5,
+      date: '2026-10-02',
+      note: 'cafe',
+    });
+  });
+
+  it('rechaza un movimiento sin origen o con los dos', () => {
+    expect(() => createTx(form({ accountId: null, creditCardId: null }))).toThrow();
+    expect(() => createTx(form({ accountId: 1, creditCardId: 3 }))).toThrow();
   });
 
   it('exige cuenta, monto y fecha', async () => {
@@ -171,11 +200,17 @@ describe('metas y recurrentes: dinero sale de una cuenta real', () => {
   it('crea recurrente mapeando la frecuencia a 1/2/3', async () => {
     stub({ id: 1 });
     await createRecurring({ name: 'Renta', amount: '300.00', frequency: 'Mensual' });
-    expect(body()).toEqual({ name: 'Renta', amount: 300, frequency: 2 });
+    expect(body()).toEqual({ name: 'Renta', amount: 300, frequency: 2, type: 2 });
     await createRecurring({ name: 'Streaming', amount: '5.00', frequency: 'Semanal' });
-    expect(body()).toEqual({ name: 'Streaming', amount: 5, frequency: 1 });
+    expect(body()).toEqual({ name: 'Streaming', amount: 5, frequency: 1, type: 2 });
     await createRecurring({ name: 'Seguro', amount: '80.00', frequency: 'Anual' });
-    expect(body()).toEqual({ name: 'Seguro', amount: 80, frequency: 3 });
+    expect(body()).toEqual({ name: 'Seguro', amount: 80, frequency: 3, type: 2 });
+  });
+
+  it('un recurrente de ingreso viaja con type 1', async () => {
+    stub({ id: 1 });
+    await createRecurring({ name: 'Sueldo', amount: '1430.65', frequency: 'Mensual', type: 1 });
+    expect(body()).toEqual({ name: 'Sueldo', amount: 1430.65, frequency: 2, type: 1 });
   });
 
   it('crea y edita metas con fecha opcional', async () => {
@@ -205,5 +240,156 @@ describe('schemas de formulario emiten codigos i18n (err.*)', () => {
       );
       expect(t.error.issues.every((i) => typeof i.message === 'string')).toBe(true);
     }
+  });
+});
+
+// Un <select> sin opción elegida emite "", no undefined. El schema de inversión
+// pide number | null: por eso el formulario coerciona antes de validar. Sin esa
+// coerción el submit se quedaba enfocando el primer select vacío.
+describe('inversiones: select vacío contra el schema', () => {
+  const base = {
+    platformId: 1,
+    amount: '100.00',
+    commission: '0',
+    transactionType: 2 as const,
+    transactionDate: '2026-10-28',
+  };
+
+  it('rechaza el "" crudo del select', () => {
+    expect(investmentSchema.safeParse({ ...base, withdrawalMethodId: '', creditCardId: '' }).success).toBe(false);
+  });
+
+  it('acepta null, que es lo que el formulario envía al no elegir', () => {
+    const result = investmentSchema.safeParse({ ...base, withdrawalMethodId: null, creditCardId: null });
+    expect(result.success).toBe(true);
+  });
+});
+
+// Corregir y borrar lo ya registrado: estas rutas tocan dinero ya asentado, así que
+// el contrato (verbo, ruta y forma del cuerpo) queda fijado acá.
+describe('correcciones: ahorros, tarjetas y recurrentes', () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  it('edita un movimiento de ahorro con el monto ya numérico', async () => {
+    stub({ id: 3 });
+    await updateSavingTx(3, { date: '2026-11-01', amount: '250.50', description: 'Corregido', transactionType: 1 });
+    expect(last().url).toContain('/api/savings/transactions/3');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ date: '2026-11-01', amount: 250.5, description: 'Corregido', transactionType: 1 });
+  });
+
+  it('borra un movimiento de ahorro', async () => {
+    stub();
+    await deleteSavingTx(3);
+    expect(last().url).toContain('/api/savings/transactions/3');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('edita una tarjeta enviando isActive', async () => {
+    stub({ id: 6 });
+    await updateCard(6, { bankName: 'BAC', creditLimit: '2000', cutOffDay: 15, paymentDueDay: 5, annualInterestRate: '0', isActive: false });
+    expect(last().url).toContain('/api/CreditCards/6');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ bankName: 'BAC', creditLimit: 2000, cutOffDay: 15, paymentDueDay: 5, annualInterestRate: 0, isActive: false });
+  });
+
+  it('borra una tarjeta', async () => {
+    stub();
+    await deleteCard(6);
+    expect(last().url).toContain('/api/CreditCards/6');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('edita un recurrente conservando su tipo', async () => {
+    stub({ id: 2 });
+    await updateRecurring(2, { name: 'Sueldo', amount: '1430.65', frequency: 'Mensual', type: 1 });
+    expect(last().url).toContain('/api/goals/recurring/2');
+    expect(last().init?.method).toBe('PUT');
+    expect(body()).toEqual({ name: 'Sueldo', amount: 1430.65, frequency: 2, type: 1 });
+  });
+
+  it('borra un recurrente', async () => {
+    stub();
+    await deleteRecurring(2);
+    expect(last().url).toContain('/api/goals/recurring/2');
+    expect(last().init?.method).toBe('DELETE');
+  });
+});
+
+describe('P1: metas borrar y refresh automático', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    clearSession();
+    configureApi({ onUnauthorized: () => {} });
+  });
+
+  it('borra una meta por id', async () => {
+    stub({ deleted: true });
+    await deleteGoal(7);
+    expect(last().url).toContain('/api/goals/7');
+    expect(last().init?.method).toBe('DELETE');
+  });
+
+  it('ante 401 renueva con refresh y reintenta una vez', async () => {
+    calls = [];
+    setSessionTokens('old-access', 'old-refresh');
+    let n = 0;
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        n++;
+        calls.push({ url, init });
+        if (url.endsWith('/api/goals') && n === 1) {
+          return { status: 401, ok: false, json: async () => ({}) } as Response;
+        }
+        if (url.endsWith('/api/Auth/refresh')) {
+          const b = JSON.parse(String(init?.body));
+          expect(b.refreshToken).toBe('old-refresh');
+          return { status: 200, ok: true, json: async () => ({ token: 'new-access', refreshToken: 'new-refresh' }) } as Response;
+        }
+        if (url.endsWith('/api/goals') && n === 3) {
+          expect(init?.headers && (init.headers as Record<string, string>).Authorization).toBe('Bearer new-access');
+          return { status: 200, ok: true, json: async () => [{ id: 1 }] } as Response;
+        }
+        return { status: 500, ok: false, json: async () => ({}) } as Response;
+      }),
+    );
+    const goals = await listGoals();
+    expect(goals).toHaveLength(1);
+    expect(getToken()).toBe('new-access');
+    expect(getRefreshToken()).toBe('new-refresh');
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(calls.map((c) => c.url)).toEqual([
+      'http://localhost:5063/api/goals',
+      'http://localhost:5063/api/Auth/refresh',
+      'http://localhost:5063/api/goals',
+    ]);
+  });
+
+  it('si el refresh falla cierra sesión y no reintenta en bucle', async () => {
+    calls = [];
+    setSessionTokens('old-access', 'old-refresh');
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.endsWith('/api/goals')) {
+          return { status: 401, ok: false, json: async () => ({}) } as Response;
+        }
+        if (url.endsWith('/api/Auth/refresh')) {
+          return { status: 401, ok: false, json: async () => ({ detail: 'expirado' }) } as Response;
+        }
+        return { status: 500, ok: false, json: async () => ({}) } as Response;
+      }),
+    );
+    await expect(listGoals()).rejects.toMatchObject({ status: 401 });
+    expect(getToken()).toBeNull();
+    expect(getRefreshToken()).toBeNull();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(calls.filter((c) => c.url.endsWith('/api/Auth/refresh'))).toHaveLength(1);
   });
 });

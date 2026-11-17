@@ -6,6 +6,7 @@ import { listCards } from '@financial/core';
 import DataTable from '../../components/DataTable';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { fmtDate } from '../../lib/date';
 
 const month = () => {
   const n = new Date();
@@ -13,10 +14,8 @@ const month = () => {
   return { from: f(new Date(n.getFullYear(), n.getMonth(), 1)), to: f(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
 };
 
-const kindOf = (t: Tx) => String(t.transactionDate ?? t.date ?? '').slice(0, 10);
-
 export default function TransactionsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [range, setRange] = useState(month);
   const [cardId, setCardId] = useState<string>('all');
   const cards = useQuery({ queryKey: ['cards', 'list'], queryFn: listCards, retry: false });
@@ -38,11 +37,11 @@ export default function TransactionsPage() {
           <option value="all">{t('tx.all')}</option>
           <option value="cash">{t('tx.cash')}</option>
           {(Array.isArray(cards.data) ? cards.data : []).map((c) => (
-            <option key={c.id} value={c.id}>{c.name ?? `#${c.id}`}</option>
+            <option key={c.id} value={c.id}>{String(c.bankName ?? c.name ?? `#${c.id}`)}</option>
           ))}
         </select>
-        <input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} aria-label={t('common.date')} />
-        <input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} aria-label={t('common.date')} />
+        <input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} aria-label={t('common.from')} title={t('common.from')} />
+        <input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} aria-label={t('common.to')} title={t('common.to')} />
       </div>
       {txs.isPending ? <Skeleton />
         : txs.isError ? <div><p className="error-text">{t('common.error')}</p><button className="btn btn--sm" onClick={() => txs.refetch()}>{t('common.retry')}</button></div>
@@ -51,14 +50,14 @@ export default function TransactionsPage() {
           columns={[
             { key: 'date', label: t('common.date') },
             { key: 'merchant', label: t('tx.merchant') },
-            { key: 'type', label: t('common.type') },
+            { key: 'type', label: t('common.type'), render: (r) => (r.type === 1 ? t('categories.income') : r.type === 2 ? t('categories.expense') : '—') },
             { key: 'amount', label: t('common.amount'), figure: true },
           ]}
           rows={items.map((x) => ({
             ...x,
-            date: kindOf(x),
+            date: fmtDate(x.transactionDate ?? x.date, i18n.language),
             merchant: x.merchant?.name ?? (x.merchantId ? `#${x.merchantId}` : '—'),
-            amount: Number(x.amount).toFixed(2),
+            amount: x.amount,
           }))}
           searchKeys={['merchant', 'description']}
           emptyText={t('common.empty')}

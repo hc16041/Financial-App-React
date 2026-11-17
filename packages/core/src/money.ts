@@ -7,3 +7,11 @@ export const formatUSD = (m: string | number): string =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
     typeof m === 'string' ? parseFloat(m) : m,
   );
+
+// Presentación de dinero en pantalla: nunca deja NaN ni "12345.67" pelado.
+// Los montos de la API llegan como number o string decimal.
+export const money = (m: string | number | null | undefined): string => {
+  if (m === null || m === undefined || m === '') return '—';
+  const n = typeof m === 'string' ? Number(m) : m;
+  return Number.isFinite(n) ? formatUSD(n) : '—';
+};

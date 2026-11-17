@@ -3,19 +3,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2 } from 'lucide-react';
-import { budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf, type BudgetForm } from '@financial/core';
+import { ArrowDownRight, ArrowUpRight, Plus, Trash2, Wallet } from 'lucide-react';
+import {
+  budgetSchema, listBudgets, createBudget, deleteBudget, pct, stateOf, money,
+  monthCashFlow, listRecurring, listLoans, type BudgetForm,
+} from '@financial/core';
 import { listCategories } from '@financial/core';
+import KpiCard from '../../components/KpiCard';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
+import { monthYear } from '../../lib/date';
 
 export default function BudgetsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const now = new Date();
   const [showForm, setShowForm] = useState(false);
   const budgets = useQuery({ queryKey: ['budgets'], queryFn: listBudgets });
+  const recs = useQuery({ queryKey: ['recurring'], queryFn: listRecurring, retry: false });
+  const loans = useQuery({ queryKey: ['loans'], queryFn: listLoans, retry: false });
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => listCategories() });
   const inv = () => qc.invalidateQueries({ queryKey: ['budgets'] });
   const create = useMutation({ mutationFn: createBudget, onSuccess: inv });
@@ -33,6 +40,17 @@ export default function BudgetsPage() {
   if (budgets.isError) return <div><p className="error-text">{t('common.error')}</p><button className="btn btn--sm" onClick={() => budgets.refetch()}>{t('common.retry')}</button></div>;
   const items = budgets.data ?? [];
 
+  // Panel del mes en curso: ingresos declarados (recurrentes de tipo ingreso),
+  // los límites de presupuesto como gasto fijo, y las cuotas de préstamos abiertos.
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const monthBudgets = items.filter((b) => Number(b.month) === month && Number(b.year) === year);
+  const flow = monthCashFlow({
+    recurrings: recs.data ?? [],
+    budgets: monthBudgets,
+    loans: loans.data ?? [],
+  });
+
   return (
     <section>
       <PageHead
@@ -40,6 +58,16 @@ export default function BudgetsPage() {
         count={items.length}
         actions={<button className="btn btn--primary" onClick={() => setShowForm(true)}><Plus size={16} aria-hidden="true" />{t('common.create')}</button>}
       />
+
+      <p className="kpi__label" style={{ marginBottom: 'var(--fp-space-2)' }}>
+        {t('budgets.flowFor', { month: monthYear(month, year, i18n.language) })}
+      </p>
+      <div className="grid-kpi" style={{ marginBottom: 'var(--fp-space-4)' }}>
+        <KpiCard label={t('budgets.expectedIncome')} value={money(flow.income)} tone="in" icon={ArrowUpRight} />
+        <KpiCard label={t('budgets.fixed')} value={money(flow.fixed)} tone="out" icon={ArrowDownRight} />
+        <KpiCard label={t('budgets.installments')} value={money(flow.installments)} tone="warn" icon={Wallet} />
+        <KpiCard label={t('budgets.free')} value={money(flow.free)} tone={flow.free < 0 ? 'out' : 'in'} icon={Wallet} />
+      </div>
 
       <Modal open={showForm} onClose={close} title={t('common.create')}>
         <form onSubmit={handleSubmit((f) => create.mutate(f, { onSuccess: close }))}>
@@ -76,9 +104,9 @@ export default function BudgetsPage() {
             {items.map((b) => (
               <tr key={b.id}>
                 <td>{b.categoryName ?? catName(b.categoryId)}</td>
-                <td>{b.month}/{b.year}</td>
-                <td className="ledger-figure">{Number(b.limit).toFixed(2)}</td>
-                <td className="ledger-figure">{Number(b.spent).toFixed(2)}</td>
+                <td>{monthYear(b.month, b.year, i18n.language)}</td>
+                <td className="ledger-figure">{money(b.limit)}</td>
+                <td className="ledger-figure">{money(b.spent)}</td>
                 <td style={{ color: color(stateOf(b)) }}>{pct(b)}%</td>
                 <td><button className="btn btn--sm btn--danger" onClick={() => remove.mutate(b.id)} title={t('common.delete')} aria-label={t('common.delete')}><Trash2 size={15} aria-hidden="true" /></button></td>
               </tr>

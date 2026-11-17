@@ -110,7 +110,7 @@ export function CentriesPage({ kind }: { kind: CentryKind }) {
           key: c.key,
           label: t(c.labelKey),
           render: (r) => typeof r[c.key] === 'boolean'
-            ? <span className={`badge ${r[c.key] ? 'badge--in' : ''}`}>{r[c.key] ? t('centries.yes') : t('centries.no')}</span>
+            ? <span className={`badge ${r[c.key] ? 'badge--in' : ''}`}>{r[c.key] ? t('categories.active') : t('categories.inactive')}</span>
             : String(r[c.key] ?? '—').slice(0, 60),
         }))}
         rows={rows}

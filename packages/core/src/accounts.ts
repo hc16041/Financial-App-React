@@ -19,19 +19,28 @@ export type Account = {
   isActive: boolean;
 };
 
-export const txSchema = z.object({
-  accountId: z.number().min(1, 'err.required'),
-  categoryId: z.number().int().positive().nullable().optional(),
-  type: z.union([z.literal(1), z.literal(2)]), // 1 ingreso, 2 gasto
-  amount: moneyString,
-  date: z.string().min(1, 'err.required'),
-  note: z.string().max(500).default(''),
-});
+// Origen único: cuenta o tarjeta. El backend rechaza ambos o ninguno.
+export const txSchema = z
+  .object({
+    accountId: z.number().int().positive().nullable().optional(),
+    creditCardId: z.number().int().positive().nullable().optional(),
+    categoryId: z.number().int().positive().nullable().optional(),
+    type: z.union([z.literal(1), z.literal(2)]), // 1 ingreso, 2 gasto
+    amount: moneyString,
+    date: z.string().min(1, 'err.required'),
+    note: z.string().max(500).default(''),
+  })
+  .refine((v) => Boolean(v.accountId) !== Boolean(v.creditCardId), {
+    message: 'err.source',
+    path: ['accountId'],
+  });
 export type PersonalTxForm = z.input<typeof txSchema>;
 export type PersonalTx = {
   id: number;
-  accountId: number;
+  accountId: number | null;
   accountName?: string | null;
+  creditCardId?: number | null;
+  creditCardName?: string | null;
   categoryId?: number | null;
   type: number;
   amount: number | string;
@@ -63,10 +72,33 @@ export const listTx = (f: TxFilters = {}) => {
   const qs = q.toString();
   return apiGet<PersonalTx[]>(`/api/accounts/transactions${qs ? `?${qs}` : ''}`);
 };
-export const createTx = (t: PersonalTxForm) => {
+/** Cuerpo numérico que espera la API. Compartido por el alta directa y la cola offline. */
+export const personalTxBody = (t: PersonalTxForm) => {
   const v = txSchema.parse(t);
-  return apiPost<PersonalTx>('/api/accounts/transactions', {
-    accountId: v.accountId,
+  return {
+    accountId: v.accountId ?? null,
+    creditCardId: v.creditCardId ?? null,
+    categoryId: v.categoryId ?? null,
+    type: v.type,
+    amount: Number(v.amount),
+    date: v.date,
+    note: v.note,
+  };
+};
+
+export const createTx = (t: PersonalTxForm, opts?: { idempotencyKey?: string }) =>
+  apiPost<PersonalTx>(
+    '/api/accounts/transactions',
+    personalTxBody(t),
+    opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : undefined,
+  );
+
+export const updateTx = (id: number, t: PersonalTxForm) => {
+  const v = txSchema.parse(t);
+  return apiPut<PersonalTx>(`/api/accounts/transactions/${id}`, {
+    id,
+    accountId: v.accountId ?? null,
+    creditCardId: v.creditCardId ?? null,
     categoryId: v.categoryId ?? null,
     type: v.type,
     amount: Number(v.amount),
@@ -74,3 +106,5 @@ export const createTx = (t: PersonalTxForm) => {
     note: v.note,
   });
 };
+
+export const deleteTx = (id: number) => apiDel<void>(`/api/accounts/transactions/${id}`);

@@ -110,7 +110,7 @@ export default function CategoriesPage() {
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>{c.type === 1 ? t('categories.income') : t('categories.expense')}</td>
-                <td>{c.icon}</td>
+                <td><span className="badge" style={{ fontFamily: 'var(--fp-font-mono)' }}>{c.icon}</span></td>
                 <td><span className={`badge ${c.isActive ? 'badge--in' : ''}`}>{c.isActive ? t('categories.active') : t('categories.inactive')}</span></td>
                 <td style={{ display: 'flex', gap: 4 }}>
                   <button className="btn btn--sm" onClick={() => openEdit(c)} title={t('common.edit')} aria-label={t('common.edit')}><Pencil size={15} aria-hidden="true" /></button>

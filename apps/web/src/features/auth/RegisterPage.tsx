@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { zodT } from '../../lib/errors';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { setToken } from '@financial/core';
+import { getBaseUrl, sessionStore, setSessionTokens, useAuth } from '@financial/core';
 
 const schema = z.object({
   email: z.string().email('err.email'),
@@ -13,7 +13,6 @@ const schema = z.object({
   lastName: z.string().min(1, 'err.required'),
 }).refine((v) => v.password === v.confirmPassword, { path: ['confirmPassword'], message: 'err.mismatch' });
 type Form = z.infer<typeof schema>;
-const API = 'http://localhost:5063';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -21,13 +20,18 @@ export default function RegisterPage() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({ resolver: zodT(schema) });
 
   const onSubmit = async (f: Form) => {
-    const res = await fetch(`${API}/api/Auth/register`, {
+    const res = await fetch(`${getBaseUrl()}/api/Auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, phoneNumber: '' }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return;
     const token = body.token ?? body.accessToken ?? body.data?.token;
-    if (token) setToken(token);
+    const refreshToken = body.refreshToken ?? body.data?.refreshToken ?? null;
+    if (token) {
+      setSessionTokens(token, refreshToken);
+      sessionStore().setItem('fa_user', f.email);
+      useAuth.setState({ token, username: f.email });
+    }
     nav({ to: '/' });
   };
 

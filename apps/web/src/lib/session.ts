@@ -1,13 +1,15 @@
 // Lectura de la sesión actual: correo guardado al entrar + claims del JWT.
 // El token es la única fuente; no se guardan datos de usuario duplicados.
+import { sessionStore } from '@financial/core';
+
 export type Session = { email: string | null; name: string | null; role: string | null; expires: number | null };
 
 const ROLE = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
 
 export function session(): Session {
-  if (typeof sessionStorage === 'undefined') return { email: null, name: null, role: null, expires: null };
-  const email = sessionStorage.getItem('fa_user');
-  const token = sessionStorage.getItem('fa_token');
+  const store = sessionStore();
+  const email = store.getItem('fa_user');
+  const token = store.getItem('fa_token');
   let name: string | null = null;
   let role: string | null = null;
   let expires: number | null = null;

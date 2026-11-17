@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { apiGet, apiPost, setToken } from './api-client';
+import { apiGet, apiPost, setSessionTokens, getToken, sessionStore } from './api-client';
 
 type AuthState = {
   token: string | null;
@@ -9,17 +9,17 @@ type AuthState = {
 };
 
 export const useAuth = create<AuthState>((set) => ({
-  token: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('fa_token') : null,
-  username: typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('fa_user') : null,
+  token: getToken(),
+  username: sessionStore().getItem('fa_user'),
   login: async (email, password) => {
-    const r = await apiPost<{ token: string }>(`/api/Auth/login`, { email, password });
-    setToken(r.token);
-    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('fa_user', email);
+    const r = await apiPost<{ token: string; refreshToken?: string }>(`/api/Auth/login`, { email, password });
+    setSessionTokens(r.token, r.refreshToken ?? null);
+    sessionStore().setItem('fa_user', email);
     set({ token: r.token, username: email });
   },
   logout: () => {
-    setToken(null);
-    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('fa_user');
+    setSessionTokens(null, null);
+    sessionStore().removeItem('fa_user');
     set({ token: null, username: null });
   },
 }));

@@ -1,0 +1,107 @@
+name: iOS unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/ios-build]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/core/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ios-unsigned.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_API_URL: https://api.ferthl.duckdns.org
+      EXPO_NO_TELEMETRY: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate native iOS project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      - name: Build unsigned app
+        working-directory: apps/mobile
+        run: |
+          set -uo pipefail
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
+          echo "Workspace: $WORKSPACE"
+          xcodebuild -workspace "$WORKSPACE" -list -json > xcodebuild-list.json 2> xcodebuild-list.err
+          LIST_CODE=$?
+          cat xcodebuild-list.err || true
+          if [ $LIST_CODE -ne 0 ]; then
+            echo "::error title=xcodebuild -list failed::$(tail -n 1 xcodebuild-list.err)"
+            exit $LIST_CODE
+          fi
+          SCHEME=$(python3 -c "import json,sys; d=json.load(open('xcodebuild-list.json')); s=d['workspace']['schemes']; a=sys.argv[1]; print(next((x for x in s if x.lower()==a.lower()), next((x for x in s if not x.lower().startswith('pods-')), s[0])))" "$(basename "$WORKSPACE" .xcworkspace)")
+          echo "Schemes: $(python3 -c "import json; print(json.load(open('xcodebuild-list.json'))['workspace']['schemes'])")"
+          echo "Scheme: $SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            -quiet > xcodebuild.log 2>&1
+          CODE=$?
+          if [ $CODE -ne 0 ]; then
+            echo "xcodebuild failed with exit code $CODE"
+            tail -n 120 xcodebuild.log
+            {
+              echo "### xcodebuild failed ($CODE)"
+              echo '```'
+              tail -n 120 xcodebuild.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error title=xcodebuild failed::$(grep -m1 -E 'error:|The following build commands failed' xcodebuild.log | head -c 300 || tail -n 1 xcodebuild.log | head -c 300)"
+            exit $CODE
+          fi
+
+      - name: Package IPA
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
+          test -n "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry LibroMayor-unsigned.ipa Payload
+          ls -lh LibroMayor-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LibroMayor-unsigned-ipa
+          path: apps/mobile/LibroMayor-unsigned.ipa
+          if-no-files-found: error

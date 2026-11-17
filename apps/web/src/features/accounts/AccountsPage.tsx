@@ -8,22 +8,26 @@ import MoneyInput from '../../components/MoneyInput';
 import Modal from '../../components/Modal';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
-import { accountSchema, txSchema, listAccounts, createAccount, listTx, createTx } from '@financial/core';
+import { fmtDate } from '../../lib/date';
+import { accountSchema, txSchema, listAccounts, listCards, createAccount, listTx, createTx, money } from '@financial/core';
 import type { TxFilters, AccountForm, PersonalTxForm } from '@financial/core';
 import { listCategories } from '@financial/core';
 
 export default function AccountsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const [showAcc, setShowAcc] = useState(false);
   const [showTx, setShowTx] = useState(false);
   const [filters, setFilters] = useState<TxFilters>({});
+  // El select de origen es uno solo; el formulario lleva cuenta y tarjeta por separado.
+  const [source, setSource] = useState<string>('');
   const accs = useQuery({ queryKey: ['accounts'], queryFn: listAccounts });
   const txs = useQuery({ queryKey: ['ptx', filters], queryFn: () => listTx(filters) });
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => listCategories() });
+  const cards = useQuery({ queryKey: ['cards'], queryFn: listCards });
   const inv = () => { qc.invalidateQueries({ queryKey: ['accounts'] }); qc.invalidateQueries({ queryKey: ['ptx'] }); };
   const addAcc = useMutation({ mutationFn: createAccount, onSuccess: inv });
-  const addTx = useMutation({ mutationFn: createTx, onSuccess: inv });
+  const addTx = useMutation({ mutationFn: (v: PersonalTxForm) => createTx(v), onSuccess: inv });
   const fAcc = useForm<AccountForm>({ resolver: zodT(accountSchema) });
   const fTx = useForm<PersonalTxForm>({
     resolver: zodT(txSchema),
@@ -33,7 +37,21 @@ export default function AccountsPage() {
   const accName = (id: number) => accs.data?.find((a) => a.id === Number(id))?.name ?? `#${id}`;
 
   const closeAcc = () => { setShowAcc(false); fAcc.reset(); };
-  const closeTx = () => { setShowTx(false); fTx.reset(); };
+  const closeTx = () => { setShowTx(false); setSource(''); fTx.reset(); };
+
+  // El select de origen muestra un valor por defecto, pero el formulario
+  // necesita accountId/creditCardId desde el inicio: si no, se envía sin
+  // origen y el backend responde "Elige una cuenta o una tarjeta".
+  const openTx = () => {
+    const firstAccount = accs.data?.[0];
+    const firstCard = cards.data?.[0];
+    const firstCategory = cats.data?.find((c) => c.isActive);
+    setSource(firstAccount ? `acc:${firstAccount.id}` : firstCard ? `card:${firstCard.id}` : '');
+    fTx.setValue('accountId', firstAccount?.id ?? null);
+    fTx.setValue('creditCardId', firstAccount ? null : firstCard?.id ?? null);
+    fTx.setValue('categoryId', firstCategory?.id ?? null);
+    setShowTx(true);
+  };
 
   if (accs.isPending || txs.isPending) return <Skeleton />;
   if (accs.isError || txs.isError) return <div><p className="error-text">{t('common.error')}</p><button className="btn btn--sm" onClick={() => { accs.refetch(); txs.refetch(); }}>{t('common.retry')}</button></div>;
@@ -46,14 +64,14 @@ export default function AccountsPage() {
         actions={
           <>
             <button className="btn" onClick={() => setShowAcc(true)}><Plus size={16} aria-hidden="true" />{t('accounts.newAccount')}</button>
-            <button className="btn btn--primary" onClick={() => setShowTx(true)}><ArrowLeftRight size={16} aria-hidden="true" />{t('accounts.movement')}</button>
+            <button className="btn btn--primary" onClick={openTx} disabled={!accs.data?.length && !cards.data?.length}><ArrowLeftRight size={16} aria-hidden="true" />{t('accounts.movement')}</button>
           </>
         }
       />
 
       <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 var(--fp-space-4)', display: 'flex', flexWrap: 'wrap', gap: 'var(--fp-space-2)' }}>
         {(accs.data ?? []).map((a) => (
-          <li key={a.id} className="card" style={{ padding: 'var(--fp-space-2) var(--fp-space-3)' }}>{a.name} ({a.type === 1 ? t('accounts.cash') : t('accounts.bank')}) — <span className="ledger-figure">{Number(a.balance).toFixed(2)}</span></li>
+          <li key={a.id} className="card" style={{ padding: 'var(--fp-space-2) var(--fp-space-3)' }}>{a.name} ({a.type === 1 ? t('accounts.cash') : t('accounts.bank')}) — <span className="ledger-figure">{money(a.balance)}</span></li>
         ))}
       </ul>
 
@@ -78,10 +96,29 @@ export default function AccountsPage() {
       <Modal open={showTx} onClose={closeTx} title={t('accounts.movement')}>
         <form onSubmit={fTx.handleSubmit((f) => addTx.mutate(f, { onSuccess: closeTx }))}>
           <div className="field">
-            <label htmlFor="tx-acc">{t('nav.accounts')}</label>
-            <select id="tx-acc" {...fTx.register('accountId', { valueAsNumber: true })}>
-              {(accs.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <label htmlFor="tx-src">{t('accounts.source')}</label>
+            <select
+              id="tx-src"
+              value={source}
+              onChange={(e) => {
+                const [kind, id] = e.target.value.split(':');
+                setSource(e.target.value);
+                fTx.setValue('accountId', kind === 'acc' ? Number(id) : null);
+                fTx.setValue('creditCardId', kind === 'card' ? Number(id) : null);
+              }}
+            >
+              <optgroup label={t('nav.accounts')}>
+                {(accs.data ?? []).map((a) => <option key={`acc-${a.id}`} value={`acc:${a.id}`}>{a.name}</option>)}
+              </optgroup>
+              <optgroup label={t('cards.title')}>
+                {(cards.data ?? []).map((c) => (
+                  <option key={`card-${c.id}`} value={`card:${c.id}`}>{String(c.name ?? c.bankName ?? `#${c.id}`)}</option>
+                ))}
+              </optgroup>
             </select>
+            {fTx.formState.errors.accountId && (
+              <p className="field__error">{t('accounts.sourceRequired')}</p>
+            )}
           </div>
           <div className="field">
             <label htmlFor="tx-cat">{t('common.category')}</label>
@@ -135,15 +172,15 @@ export default function AccountsPage() {
           <option value="">{t('common.all')} — {t('common.category')}</option>
           {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" aria-label={`${t('common.date')} (desde)`} title={`${t('common.date')} (desde)`} value={filters.from ?? ''} onChange={(e) => setFilters({ ...filters, from: e.target.value || undefined })} />
-        <input type="date" aria-label={`${t('common.date')} (hasta)`} title={`${t('common.date')} (hasta)`} value={filters.to ?? ''} onChange={(e) => setFilters({ ...filters, to: e.target.value || undefined })} />
+        <input type="date" aria-label={t('common.from')} title={t('common.from')} value={filters.from ?? ''} onChange={(e) => setFilters({ ...filters, from: e.target.value || undefined })} />
+        <input type="date" aria-label={t('common.to')} title={t('common.to')} value={filters.to ?? ''} onChange={(e) => setFilters({ ...filters, to: e.target.value || undefined })} />
         <button className="btn btn--sm" onClick={() => setFilters({})}>{t('common.clear')}</button>
       </div>
 
       <div className="table-wrap"><table className="ledger">
-        <thead><tr><th>{t('common.date')}</th><th>{t('nav.accounts')}</th><th>{t('common.category')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th></tr></thead>
+        <thead><tr><th>{t('common.date')}</th><th>{t('accounts.source')}</th><th>{t('common.category')}</th><th>{t('common.type')}</th><th>{t('common.amount')}</th></tr></thead>
         <tbody>{(txs.data ?? []).map((tx) => (
-          <tr key={tx.id} data-sign={tx.type === 1 ? 'in' : 'out'}><td>{tx.date.slice(0, 10)}</td><td>{tx.accountName ?? accName(tx.accountId)}</td><td>{tx.categoryId ? catName(tx.categoryId) : '—'}</td><td>{tx.type === 1 ? t('categories.income') : t('categories.expense')}</td><td className="ledger-figure">{Number(tx.amount).toFixed(2)}</td></tr>
+          <tr key={tx.id} data-sign={tx.type === 1 ? 'in' : 'out'}><td>{fmtDate(tx.date, i18n.language)}</td><td>{tx.accountName ?? tx.creditCardName ?? (tx.accountId ? accName(tx.accountId) : '—')}</td><td>{tx.categoryId ? catName(tx.categoryId) : '—'}</td><td>{tx.type === 1 ? t('categories.income') : t('categories.expense')}</td><td className="ledger-figure">{money(tx.amount)}</td></tr>
         ))}</tbody>
       </table></div>
       {(txs.data ?? []).length === 0 && <p className="empty-state">{t('accounts.empty')}</p>}

@@ -4,8 +4,8 @@ import { X } from 'lucide-react';
 
 // Modal sobre <dialog> nativo: foco atrapado, ESC y backdrop gratis.
 // El estado `open` lo controla el padre; cerrar (ESC/backdrop/botón) avisa onClose.
-export default function Modal({ open, onClose, title, children }: {
-  open: boolean; onClose: () => void; title: string; children: ReactNode;
+export default function Modal({ open, onClose, title, children, wide = false }: {
+  open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
@@ -20,7 +20,7 @@ export default function Modal({ open, onClose, title, children }: {
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={wide ? 'modal modal--wide' : 'modal'}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
     >

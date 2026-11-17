@@ -5,7 +5,7 @@ import { Donut } from '../../components/Charts';
 import KpiCard from '../../components/KpiCard';
 import PageHead from '../../components/PageHead';
 import Skeleton from '../../components/Skeleton';
-import { getDashboardSummary } from '@financial/core';
+import { getDashboardSummary, money } from '@financial/core';
 
 // FEAT-09: GET /api/dashboard/summary real (orquesta queries en el backend).
 export default function DashboardPage() {
@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <PageHead title={t('dash.title')} />
       <div className="grid-2">
         <div className="balance-strip">
-          <div className="balance-strip__total ledger-figure">{Number(d.totalBalance).toFixed(2)}</div>
+          <div className="balance-strip__total ledger-figure">{money(d.totalBalance)}</div>
           <p style={{ color: 'var(--fp-text-muted)', margin: 'var(--fp-space-1) 0 0' }}>{t('dash.total')}</p>
         </div>
         <div className="card">
@@ -37,9 +37,9 @@ export default function DashboardPage() {
         </div>
       </div>
       <div className="grid-kpi" style={{ marginTop: 'var(--fp-space-4)' }}>
-        <KpiCard label={t('dash.savings')} value={Number(d.savings).toFixed(2)} tone="in" icon={PiggyBank} />
-        <KpiCard label={t('dash.investments')} value={Number(d.investments).toFixed(2)} tone="in" icon={TrendingUp} />
-        <KpiCard label={t('dash.debt')} value={Number(d.cardDebt).toFixed(2)} tone="out" icon={CreditCard} />
+        <KpiCard label={t('dash.savings')} value={money(d.savings)} tone="in" icon={PiggyBank} />
+        <KpiCard label={t('dash.investments')} value={money(d.investments)} tone="in" icon={TrendingUp} />
+        <KpiCard label={t('dash.debt')} value={money(d.cardDebt)} tone="out" icon={CreditCard} />
       </div>
       {d.isProvisional && <p style={{ color: 'var(--fp-text-muted)', fontSize: '0.8125rem', marginTop: 'var(--fp-space-3)' }}>{t('dash.provisional')}</p>}
     </section>
