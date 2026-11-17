@@ -64,10 +64,14 @@ fi
 
 if [ "$HACER_API" = 1 ]; then
   echo "==> Subiendo backend"
-  TMP_API="/tmp/finanzas-api-src-$$.tgz"
-  tar -czf "$TMP_API" \
-    --exclude='*/obj' --exclude='*/bin' --exclude='.git' \
-    -C ../FinancialApp-backend .
+  if [ -n "$(git -C ../FinancialApp-backend status --porcelain)" ]; then
+    echo "ERROR: el working tree de FinancialApp-backend tiene cambios sin commitear."
+    echo "Commitealos o descartalos antes de desplegar; el deploy usa el commit, no el working tree."
+    exit 1
+  fi
+
+  TMP_API="/tmp/finanzas-api-clean-$$.tgz"
+  git -C ../FinancialApp-backend archive --format=tar.gz -o "$TMP_API" HEAD
   scp -i "$KEY" -o StrictHostKeyChecking=no "$TMP_API" "$HOST:/tmp/api.tgz"
 
   echo "==> Reconstruyendo imagen (ARM64, puede tardar)"
